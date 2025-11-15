@@ -144,7 +144,7 @@ def propriedades_oleo(P, TF, dg, do, Pb, Rs, z, Bob, rhoob):
 
 
 # Dados de entrada
-dg = 0.84 
+dg = 0.75
 do = 0.86
 Pb = 5000
 Rs = None  
