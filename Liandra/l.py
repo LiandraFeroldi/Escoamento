@@ -141,7 +141,91 @@ def propriedades_oleo(P, TF, dg, do, Pb, Rs, z, Bob, rhoob):
     uos = viscosidade_oleo_saturado(P, Pb, Rs, uom)
 
     return Api, Rs, Pb, Bo, rhoo, uom, uos, Co, Bg
+#--------------------------------------------------------------------------------------------
+#COMPONENTES DA ÁGUA
+S=1 #Salinidade em % do peso dos sólidos
+def massa_especifica_agua(S):
+    rhow=62.368+(0.438603)*S +(1.60074*10**-3)*(S**2) #lb/SCF
+    return rhow
 
+def Razao_de_Solubilidade_agua(P,Tf):
+    # Coeficientes para o parâmetro A
+    A0 = 8.15839
+    A1 = -6.12265e-2  # 10^-2
+    A2 = 1.91663e-4   # 10^-4
+    A3 = -2.1654e-7   # 10^-7
+    
+    # Coeficientes para o parâmetro B
+    B0 = 1.01021e-2   # 10^-2
+    B1 = -7.44241e-5   # 10^-5
+    B2 = 3.05553e-7   # 10^-7
+    B3 = -2.94883e-10  # 10^-10
+    
+    # Coeficientes para o parâmetro C
+    C0 = -9.02505
+    C1 = 0.130237
+    C2 = -8.53425e-4   # 10^-4
+    C3 = 2.34122e-6   # 10^-6
+    C4 = -2.37049e-9   # 10^-9
+    A = A0 + A1*Tf + A2*math.pow(Tf, 2) + A3*math.pow(Tf, 3)
+    
+    B = B0 + B1*Tf + B2*math.pow(Tf, 2) + B3*math.pow(Tf, 3)
+    C_interno = C0 + C1*Tf+ C2*math.pow(Tf, 2) + C3*math.pow(Tf, 3) + C4*math.pow(Tf, 4)
+    C = C_interno * 1e-7  # 10^-7
+    Rsw = A + B*P + C*math.pow(P, 2)
+    return Rsw
+
+def Volume_formação_agua(P,Tf):
+    delta_VwT = (
+        -1.0001e-2 +
+         1.33391e-4 * Tf +
+         5.50654e-7 * math.pow(T, 2)
+    )
+    termo1 = -1.95301e-9 * P * Tf
+    termo2 = -1.72834e-13 * math.pow(P, 2) * Tf
+    termo3 = -3.58922e-7 * P
+    termo4 = -2.25341e-10 * math.pow(P, 2)
+    
+    delta_Vwp = termo1 + termo2 + termo3 + termo4
+    Bw = (1 + delta_VwT) * (1 + delta_Vwp)
+    
+    return Bw
+
+def viscosidade_agua(P, Tf, S):
+    A0 = 109.527
+    A1 = -8.40564
+    A2 = 0.313314
+    A3 = 8.72213e-3
+
+    B0 = -1.12166
+    B1 = 2.63951e-2
+    B2 = -6.7946e-4
+    B3 = -5.47119e-5
+    B4 = -1.55586e-6
+
+
+    A = A0 + A1*S + A2*(S**2) + A3*(S**3)
+
+    B = B0 + B1*S + B2*(S**2) + B3*(S**3) + B4*(S**4)
+
+    mu_w1 = A * (Tf**B)
+
+    pressao_factor = 0.9994 + 4.0295e-5*P + 3.1062e-9*(P**2)
+    uw = mu_w1 * pressao_factor
+
+    return uw
+
+
+def propriedades_agua(S,P,Tf):
+    rhow=massa_especifica_agua(S)
+    Rsw=Razao_de_Solubilidade_agua(P,Tf)
+    Bw=Volume_formação_agua(P,Tf)
+    uw=viscosidade_agua(P,Tf,S)
+
+    return rhow, Rsw, Bw, uw
+
+
+#-----------------------------------------------------------------------------------------------
 
 # Dados de entrada
 dg = 0.75
@@ -157,6 +241,8 @@ Ppc, Tpc, Ppr, Tpr, z, Cg, rhog, Mg, ug, Bg = propriedades_gas(P, T, dg)
 
 # Cálculo ÓLEO
 Api, Rs, Pb, Bo, rhoo, uom, uos, Co, Bg_oleo = propriedades_oleo(P, Tf.GetValue('degF'), dg, do, Pb, Rs, z, Bob, rhoob)
+
+rhow, Rsw, Bw, uw=propriedades_agua(S,P,Tf)
 
 # --- Resultados ---
 print("\n--- GÁS ---")
