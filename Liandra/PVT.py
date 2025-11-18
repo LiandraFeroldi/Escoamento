@@ -23,7 +23,6 @@ def fator_compressibilidade_papay(Ppr, Tpr):
     return z
 #--------------------------------------------------------------------
 #GÁS
- 
 def dados_gas(Mar,dg,z,R,T):
     Mg = Mar * dg
     rhog = (P * Mg) / (z * R * T) #Acho que a P e T não estão na unidade certa
@@ -78,6 +77,12 @@ def massa_especifica_oleo(Rs, dg, do, Bo, P, Pb, rhoob, Co):
         rhoo = (62.4 * do + 0.0136 * Rs * dg) / Bo
     return rhoo
 
+def viscosidade_oleo_morto(Api, TF):
+    #Viscosidade do Óleo Morto Correlação de Beggs e Robinson (1975)
+    A = 10 ** (3.0324 - 0.02023 * Api)
+    uom = 10 ** (A * TF ** -1.163) - 1
+    return uom
+
 def viscosidade_oleo_saturado(P, Pb, Rs, uom):
     #Viscosidade do Óleo saturado Correlação de Beggs e Robinson (1975)
     if P <= Pb:
@@ -88,10 +93,20 @@ def viscosidade_oleo_saturado(P, Pb, Rs, uom):
         m = 2.68 * (P ** 1.187) * np.exp(-11.513 - (8.98e-5) * P)
         uos = uom * (P / Pb) ** m
     return uos
+
+def compressibilidade_oleo(P, TF, dg, do, Rs, Bo, z, Api, Bg, Pb, rhoob):
+    if P >= Pb:
+        Co = 10**6 * np.exp((rhoob + 0.004347 * (P - Pb) - 79.1) / (0.0007141 * (P - Pb) - 12.938))
+    else:
+        dRs_dP = dg * (1 / 0.83) * (((P / 18.2) + 1.4) * (10 ** (0.0125 * Api - 0.00091 * TF))) ** (1 / 0.83 - 1) * (1 / 18.2) * (10 ** (0.0125 * Api - 0.00091 * TF))
+        dBo_dP = 0.00012 * 1.2 * (Rs * ((dg / do) ** 0.5) + 1.25 * TF) ** 0.2 * ((dg / do) ** 0.5) * dRs_dP
+        Co = -(1 / Bo) * dBo_dP + (Bg / Bo) * dRs_dP
+    return Co
+
 #-----------------------------------------------------------------------------------
 #água
 #COMPONENTES DA ÁGUA
-S=1 #Salinidade em % do peso dos sólidos
+ 
 def massa_especifica_agua(S):
     rhow=62.368+(0.438603)*S +(1.60074*10**-3)*(S**2) #lb/SCF
     return rhow
@@ -198,7 +213,7 @@ def propriedades_agua(S,P,TF):
     uw=viscosidade_agua(P,TF,S)
 
     return rhow, Rsw, Bw, uw
-#--------------------------------------------------------------------------------------------
+#---------------------------------------------------------------
 
 
 # Vazões -------------------------------------------------------
@@ -216,15 +231,14 @@ def vazao_insitu(qosc,Bo,qwsc,Rs,Rsw,Bg,qgsc):
     ql=qosc*Bo +qwsc
     qg=(qgsc-qosc*Rs-qwsc*Rsw)*Bg
     return ql,qg
-#------------------------------------------------------------------
+#---------Dados de entrada---------------------------------------------------------
 
-
-# Dados de entrada
 dg = 0.75
 qlsc_d=10000 #sm³/d
 bsw=0.3
 RGL=150 #(sm³/sm³)
 Api=25
+S=bsw #Salinidade em % do peso dos sólido, por aproximação
 Pb = 0 # P está abaixo da pressão de bolha
 TF = Scalar(122, 'degF') # Temperatura em Fahrenheit
 Tc=TF.GetValue('degC')  # Converte para Celsius
