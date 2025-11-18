@@ -2,7 +2,6 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
-import pandas as pd
 
 class PVT():
     def fase_gas(T1, P1, Z, Ppr, Tpr, rho_g1):
