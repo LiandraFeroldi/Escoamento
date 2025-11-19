@@ -1,4 +1,4 @@
-from barril.units import Scalar
+
 import math
 import numpy as np
    
@@ -109,7 +109,7 @@ def viscosidade_oleo_saturado(P, Pb, Rs, uom):
         uos = uom * (P / Pb) ** m
     return uos
 
-def compressibilidade_oleo(P, TF, dg, do, Rs, Bo, z, Api, Bg, Pb, rhoob):
+def compressibilidade_oleo(P, TF, dg, do, Rs, Bo, Api, Bg, Pb, rhoob):
     if P >= Pb:
         Co = 10**6 * np.exp((rhoob + 0.004347 * (P - Pb) - 79.1) / (0.0007141 * (P - Pb) - 12.938))
     else:
@@ -231,14 +231,6 @@ def propriedades_gas(P, T, dg):
 
 def propriedades_oleo(P, TF, dg, do, Pb, Rs, z, Bob, rhoob):
 
-    
-    if Pb is None and Rs is not None:
-        Pb = obter_pressao_bolha(Rs, dg, Api, TF)
-    elif Rs is None and Pb is not None:
-        Rs = razao_solubilidade_gas_oleo(P, dg, Api, TF, Pb)
-    elif Rs is None and Pb is None:
-        raise ValueError("Forneça Rs ou Pb para calcular propriedades do óleo.")
-
     Bg = fator_formacao_gas(z, TF, P)
     Co = compressibilidade_oleo(P, TF, dg, do, Rs, Bob, z, Api, Bg, Pb, rhoob)
     Bo = fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, Bob, Co)
@@ -258,6 +250,7 @@ def propriedades_gas_unificado(P, TF_degR, dg, Mar, R):
     return Ppc, Tpc, Ppr, Tpr, z, rhog, Mg, ug, Bg
 
 #--------------------------------------------------------------------------------------------------------------------------
+
 def area(d):
      Ap = np.pi * (d / 2)**2
      return Ap
@@ -350,6 +343,7 @@ def calcular_temperaturas(
         "T_pr_vertical": T_pr_vert
     }
 
+#Modelo  Beggs & Brill
     
 
 
