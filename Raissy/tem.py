@@ -36,8 +36,8 @@ class pvt_reser():
         T3 = 15 * (9/5) + 491.67
         σwg = 0.004 #N/m
         σog = 0.00841 #N/m
-        0_rad1 = math.radians(60)
-        0_rad2 = math.radians(30)
+        teta_rad1 = math.radians(60)
+        teta_rad2 = math.radians(30)
         theta_3 = math.radians(90)
         print(T1, T2, T3)
         print(P1)
@@ -63,7 +63,7 @@ class pvt_reser():
         Cp = ((2 * 10**-3) * T_sup - 1.429) * do + (2.67 * 10**-3) * T_sup + 3.049
         print(f'Calor Específico Óleo: {round(q_m, 5)} kg/m^3') # O print usa q_m, pode ser um typo no original
         
-        L_poco = Z_poco / np.sin(0_rad1)
+        L_poco = Z_poco / np.sin(teta_rad1)
         print(f'Poço - Manifold: {round(L_poco, 5)} m')
         v = Q_I / Ap
         print(v, 'velocidade')
@@ -86,7 +86,7 @@ class pvt_reser():
         T_L = []
         for i in range(len(x)):
             T_novo[i] -= d_T * i
-            T_L_value = T_novo[i] - ((q_m * g * np.sin(0_rad1)) / TEC_poco) * (np.exp((-TEC_poco / (q_m * Cp)) * L_poco)) * (T_novo[i] - (q_m * g * np.sin(0_rad1)) / TEC_poco - T_old[i])
+            T_L_value = T_novo[i] - ((q_m * g * np.sin(teta_rad1)) / TEC_poco) * (np.exp((-TEC_poco / (q_m * Cp)) * L_poco)) * (T_novo[i] - (q_m * g * np.sin(teta_rad1)) / TEC_poco - T_old[i])
             T_L.append(T_L_value)
             T_old_value = T_L_value
             T_old.append(T_old_value)
@@ -292,11 +292,11 @@ class pvt_reser():
         print(f'Viscosidade da Água: {round(μw_si, 8)} Pa.s')
         
         return T_L, T_L2, T_L3, T_pr_hor, T_pr_vert, T_pr_inc, e, d, Q_I, Bo, Bw, RGL, Rs, \
-               RSW, Bg, rho_w, rho_o, rho_g1, σwg, σog, μw_si, μo_si, g, 0_rad1, rho_g, µg, P1, L_poco, \
+               RSW, Bg, rho_w, rho_o, rho_g1, σwg, σog, μw_si, μo_si, g, teta_rad1, rho_g, µg, P1, L_poco, \
                theta_3, P3, L_bomba, L_manifold, P1_bar, n, P_pc, P3_bar, do, API, bsw, Z # Z_poco foi trocado por Z
 
     def calculate_bb(T_L, T_L2, T_L3, T_pr_hor, T_pr_vert, T_pr_inc, e, d, Q_I, Bo, Bw,
-                     RGL, RS, RSW, Bg, rho_w, rho_o, σwg, σog, μw_si, μo_si, g, 0_rad1, rho_g, µg, P1, L_poco,
+                     RGL, RS, RSW, Bg, rho_w, rho_o, σwg, σog, μw_si, μo_si, g, teta_rad1, rho_g, µg, P1, L_poco,
                      theta_3, P3, L_bomba, L_manifold, P1_bar, n, P_pc, P3_bar, Z_poco):
         
         # Modelo Beggs & Brill
@@ -376,7 +376,7 @@ class pvt_reser():
         Hlo = (a * xl**b) / (Frm)**c
         Nlv = Vsl * ((rhol / (g * σl))**(1 / 4))
         C = (1 - xl) * (np.log(2.960 * (xl**0.305) * (Nlv**(-0.4473)) * (Frm)**0.0978))
-        ψ = 1 + C * (np.sin(1.8 * 0_rad1) - 0.333 * (np.sin(1.8 * 0_rad1))**3)
+        ψ = 1 + C * (np.sin(1.8 * teta_rad1) - 0.333 * (np.sin(1.8 * teta_rad1))**3)
         Hl = Hlo * ψ
         
         print(f'Holdup Líquido: {round(Hl, 5)}')
@@ -416,7 +416,7 @@ class pvt_reser():
         dp_dl_f1 = f_tp * ((rho_ns * Vm**2) / (2 * d))
         print("Gradiente de Pressão de Fricção:", dp_dl_f1, "N/m")
         # Gradiente de Pressão Gravitacional:
-        dp_dl_g1 = rho_slip * g * np.sin(0_rad1)
+        dp_dl_g1 = rho_slip * g * np.sin(teta_rad1)
         print("Gradiente de Pressão Gravitacional:", dp_dl_g1, "N/m")
         # Parâmetro Ek:
         Ek1 = ((rho_slip * Vm * Vsg)) / (P1 * 6894.76)

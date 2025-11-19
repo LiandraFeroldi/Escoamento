@@ -21,3 +21,4 @@ tensao_og=0.00841   #N/m
 tensao_wg=0.004 #N/m
 TEC_w=2  #w/mK
 TEC_amb=1      #w/mK
+
