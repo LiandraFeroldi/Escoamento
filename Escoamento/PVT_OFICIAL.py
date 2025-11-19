@@ -233,3 +233,73 @@ def propriedades_gas_unificado(P, TF_degR, dg, Mar, R):
     ug = viscosidade_gas_lee(Mg, TF_degR, rhog)
     Bg = fator_formacao_gas(z, TF_degR, P)
     return Ppc, Tpc, Ppr, Tpr, z, rhog, Mg, ug, Bg
+
+# ------------------ Bloco principal (exemplo de uso coerente) ------------------
+if __name__ == "__main__":
+    dg = 0.75
+    qlsc_d = 10000.0  # sm3/d 
+    bsw = 0.3
+    RGL = 150.0
+    Api = 25.0
+    S = 0.0
+    T=50
+    TF =50
+    TR=50
+    Tk=50
+    P = 7977.08   # psi (verifique se é psi mesmo)
+    Mar = 28.96
+    R = 10.7316
+    d= 6 * 0.0254 # diâmetro m
+    e = 3 * 10**(-6)
+    T_sup=17 #C
+    T1=80*(9/5) + 491.67
+    T2= 4 *(9/5) + 491.67
+    T3=17 *(9/5) + 491.67
+    P_sc = 14.7 # Pressão na condição padrão [psia]
+    T_sc = 60 # Temperatura na condição padrão [°F]
+    TEC_marinho = 1 #[w/mk]
+    TEC_poco = 2
+    L_bomba = 1050 #m
+    L_manifold = 700 #m
+    TVDpoco = 450
+    rho_w = 1000
+    rho_ar = 1.225 #kg/m**3
+    P1 = 350 * 14.504 #psi
+    P1_bar = 350 #bar
+    P3 = 5 * 14.504 #psi
+    P3_bar = 5 #bar
+    g = 9.81 #m/s**2
+    T1 = 80 *(9/5) + 491.67
+    T2_C = 4 #°C
+    T1_F = T1 - 459.67
+    T2 = 4 *(9/5) + 491.67
+    T3 = 15 *(9/5) + 491.67
+    sigma_wg = 0.004 #N/m
+    sigma_og = 0.00841 #N/
+    thata1=math.radians(60)
+    theta2=math.radians(30)
+    theta_3 =math.radians(90)
+
+    
+
+    # Gás
+    Ppc, Tpc, Ppr, Tpr, z, rhog, Mg, ug, Bg = propriedades_gas_unificado(P, TR, dg, Mar, R)
+    print("gás: z, rhog, Mg, ug, Bg =", z, rhog, Mg, ug, Bg)
+
+    # Óleo - calcular do (densidade relativa) e rhoo base
+    do, rhoo_kg_m3 = dados_oleo(Api)
+    # Escolher: usar Pb calculado por Standing com RGL ou calcular Rs primeiro.
+    Pb = obter_pressao_bolha(RGL, dg, Api, TF)
+    Rs = razao_solubilidade_gas_oleo(P, dg, Api, TF, Pb)
+    Bo, Bob = fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, RGL)
+    rhoo, rhoob = massa_especifica_oleo_INSITU(Rs, dg, do, Bo, P, Pb, RGL)
+    uom = viscosidade_oleo_morto(Api, TF)
+    uos = viscosidade_oleo_saturado(P, Pb, Rs, uom)
+    print("óleo: Pb, Rs, Bo, rhoo, uom, uos =", Pb, Rs, Bo, rhoo, uom, uos)
+
+    # Água
+    rhow = massa_especifica_agua(S)
+    Rsw = Razao_de_Solubilidade_agua(P, TF)
+    Bw = Volume_formacao_agua(P, TF)
+    uw = viscosidade_agua(P, TF, S)
+    print("água: rhow, Rsw, Bw, uw =", rhow, Rsw, Bw, uw)
