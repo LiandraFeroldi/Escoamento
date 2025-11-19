@@ -1,7 +1,6 @@
 from barril.units import Scalar
 import math
 import numpy as np
-
 # --- Constantes ---
 rhoob = 1  
 Bob = 1    

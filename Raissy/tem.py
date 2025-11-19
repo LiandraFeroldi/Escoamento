@@ -34,8 +34,8 @@ class pvt_reser():
         T1_F = T1 - 459.67
         T2 = 4 * (9/5) + 491.67
         T3 = 15 * (9/5) + 491.67
-        σwg = 0.004 #N/m
-        σog = 0.00841 #N/m
+        sigma_wg = 0.004 #N/m
+        sigma_og = 0.00841 #N/m
         0_rad1 = math.radians(60)
         0_rad2 = math.radians(30)
         theta_3 = math.radians(90)
