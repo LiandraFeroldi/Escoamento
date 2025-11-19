@@ -358,11 +358,46 @@ def vm(vsg,vsl):
     return vm
 
 def Holdap_no_slip(vm,vsl):
-    lambida=vsl/vm
-    return lambida
+    lambda_L=vsl/vm
+    return lambda_L
 
-def Fvm():
-    Frm=
+def Fvm(vm,g,):
+    Frm=vm**2/(g*d)
+    return Frm
+
+def L1(lambda_L):
+    return 316 * (lambda_L ** 0.302)
+
+def L2(lambda_L):
+    return 0.0009252 * (lambda_L ** -2.4684)
+
+def L3(lambda_L):
+    return 0.10 * (lambda_L ** -1.4516)
+
+def L4(lambda_L):
+    return 0.5 * (lambda_L ** -6.738)
+
+def padrao_escoamento(lambda_L, Fr_m2):
+    # Padrão Distribuído
+    if (lambda_L < 0.4 and Fr_m2 >= L1(lambda_L)) or (lambda_L >= 0.4 and Fr_m2 > L4(lambda_L)):
+        return "Distribuído"
+    
+    # Padrão Segregado
+    if (lambda_L < 0.01 and Fr_m2 < L1(lambda_L)) or (lambda_L >= 0.001 and Fr_m2 < L2(lambda_L)):
+        return "Segregado"
+    
+    # Transição
+    if lambda_L >= 0.01 and L2(lambda_L) <= Fr_m2 <= L3(lambda_L):
+        return "Transição"
+    
+    # Intermitente
+    if (0.01 <= lambda_L < 0.4 and L3(lambda_L) <= Fr_m2 <= L1(lambda_L)) or \
+       (lambda_L >= 0.4 and L3(lambda_L) <= Fr_m2 <= L4(lambda_L)):
+        return "Intermitente"
+
+    return "Indeterminado"
+
+
 
 
 
