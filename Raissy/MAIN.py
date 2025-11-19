@@ -7,13 +7,13 @@ from temp_2 import PVT
 
 # Supondo que pvt_reser e PVT sejam módulos com as funções necessárias já definidas
 T_L, T_L2, T_L3, T_pr_hor, T_pr_vert, T_pr_inc, e, d, Q_I, Bo, Bw, RGL, Rs, RSW, Bg, \
-rho_w, rho_o, rho_g1, σwg, σog, μw_si, μo_si, g, 0_rad1, rho_g, µg, P1, L_poco, theta_3, \
+rho_w, rho_o, rho_g1, σwg, σog, μw_si, μo_si, g, teta_rad1, rho_g, µg, P1, L_poco, theta_3, \
 P3, L_bomba, L_manifold, P1_bar, n, P_pc, P3_bar, do, API, bsw, Z_poco = \
     pvt_reser.calculate_pvt_reser()
 
 P_L1, P_L2, P_L3, P_pr_hor, P_pr_inc, P_pr_vert, Z2_hor, Z3_vert, Z1_inc = \
     pvt_reser.calculate_bb(T_L, T_L2, T_L3, T_pr_hor, T_pr_vert, T_pr_inc, e, d, Q_I, Bo, Bw,
-                         RGL, RS, RSW, Bg, rho_w, rho_o, σwg, σog, μw_si, μo_si, g, 0_rad1, rho_g, µg, P1,
+                         RGL, RS, RSW, Bg, rho_w, rho_o, σwg, σog, μw_si, μo_si, g, teta_rad1, rho_g, µg, P1,
                          L_poco, theta_3, P3, L_bomba, L_manifold, P1_bar, n, P_pc, P3_bar, Z_poco)
 
 tabela = []
