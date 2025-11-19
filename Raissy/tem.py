@@ -36,8 +36,8 @@ class pvt_reser():
         T3 = 15 * (9/5) + 491.67
         σwg = 0.004 #N/m
         σog = 0.00841 #N/m
-        teta_rad1 = math.radians(60)
-        teta_rad2 = math.radians(30)
+        0_rad1 = math.radians(60)
+        0_rad2 = math.radians(30)
         theta_3 = math.radians(90)
         print(T1, T2, T3)
         print(P1)
