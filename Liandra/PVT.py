@@ -119,13 +119,12 @@ def compressibilidade_oleo(P, TF, dg, do, Rs, Bo, z, Api, Bg, Pb, rhoob):
     return Co
 
 
-# --- Água (mantive suas funções, só corrigi pequenos nomes) ---
+# --- Água ---
 def massa_especifica_agua(S):
     rhow = 62.368 + 0.438603 * S + 1.60074e-3 * (S**2)
     return rhow
 
 def Razao_de_Solubilidade_agua(P, TF):
-    # (mantive a sua função, assumindo entradas consistentes)
     A0 = 8.15839
     A1 = -6.12265e-2
     A2 = 1.91663e-4
@@ -258,6 +257,129 @@ def propriedades_gas_unificado(P, TF_degR, dg, Mar, R):
     Bg = fator_formacao_gas(z, TF_degR, P)
     return Ppc, Tpc, Ppr, Tpr, z, rhog, Mg, ug, Bg
 
+#--------------------------------------------------------------------------------------------------------------------------
+def area(d):
+     Ap = np.pi * (d / 2)**2
+     return Ap
+
+def massica():
+    qm = qlsc * do
+    return qm
+# NÃO SABEMOS DE ONDE VEM
+def calor_especifico(do,T_sup,qm):
+    #correlação para achar cp do oleo
+    Cp =((2 * 10**-3) * T_sup - 1.429) * do +(2.67 * 10**-3) * T_sup + 3.049
+    print(f'Calor Específico Óleo: {round(qm, 5)}kg/m^3') # O print usa q_m, pode ser um typo no original
+    return Cp
+
+def comprimento_poço(TDVpoco,theta1):
+    Lpoco = TDVpoco /np.sin(theta1)
+    print(f'Poço - Manifold: {round(Lpoco, 5)}m')
+    return Lpoco
+
+#inclinado 
+def malha(Lpoco):
+    n=500
+    deltaL=Lpoco/n
+    print(f'Distância entre pontos Poço: {round(deltaL, 5)}m')
+    return
+
+def deltaT(T1,T2,n):
+    dT =(T1 - T2) / n
+    print(f'Distância entre pontos Temperatura: {round(dT, 5)}°R')
+
+def calcular_temperaturas(
+        TVDpoço, L_manifold, L_bomba,
+        T1, T2, T3, Tpc,
+        Cp, qm, g,
+        theta1, theta_marinho,
+        TEC_poco, TEC_marinho,
+        n=500
+    ):
+
+    # ---------- TRECHO INCLINADO (DESCIDA) ----------
+    x = np.linspace(0, TVDpoço, n)
+    dT1 = (T1 - T2) / n
+    T_novo = np.full_like(x, T1)
+    T_old = [T1]
+    T_L = []
+
+    for i in range(n):
+        T_novo[i] -= dT1 * i
+        expo = np.exp(-(TEC_poco / (qm * Cp)) * TVDpoço)
+        T_L_value = T_novo[i] - ((qm * g * np.sin(theta1)) / TEC_poco) * expo * \
+                    (T_novo[i] - (qm * g * np.sin(theta1)) / TEC_poco - T_old[i])
+        T_L.append(T_L_value)
+        T_old.append(T_L_value)
+
+    # Temperatura reduzida - trecho inclinado
+    T_pr_inc = [T / Tpc for T in T_L]
+
+
+    # ---------- TRECHO HORIZONTAL ----------
+    x_h = np.linspace(0, L_manifold, n)
+    T_L2 = [T2 for _ in range(n)]
+
+    # Temperatura reduzida horizontal
+    T_pr_hor = [T2 / Tpc for _ in range(n)]
+
+    # ---------- TRECHO VERTICAL (SUBIDA) ----------
+    y = np.linspace(TVDpoço, L_bomba, n)
+    dT3 = (T3 - T2) / n
+    T_novo = np.full_like(y, T2)
+    T_old = [T2]
+    T_L3 = []
+
+    for i in range(n):
+        T_novo[i] += dT3 * i
+        expo = np.exp(-(TEC_marinho / (qm * Cp)) * L_bomba)
+        T_L_value = T_novo[i] - ((qm * g) / TEC_marinho) * expo * \
+                    (T_novo[i] - (qm * g) / TEC_marinho - T_old[i])
+        T_L3.append(T_L_value)
+        T_old.append(T_L_value)
+
+    # Temperatura reduzida vertical
+    T_pr_vert = [T / Tpc for T in T_L3]
+    # ---------- RETORNO ----------
+    return {
+        "T_inclinado": T_L,
+        "T_pr_inclinado": T_pr_inc,
+        "T_horizontal": T_L2,
+        "T_pr_horizontal": T_pr_hor,
+        "T_vertical": T_L3,
+        "T_pr_vertical": T_pr_vert
+    }
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ------------------ Bloco principal (exemplo de uso coerente) ------------------
 if __name__ == "__main__":
     dg = 0.75
@@ -273,6 +395,38 @@ if __name__ == "__main__":
     P = 7977.08   # psi (verifique se é psi mesmo)
     Mar = 28.96
     R = 10.7316
+    d= 6 * 0.0254 # diâmetro m
+    e = 3 * 10**(-6)
+    T_sup=17 #C
+    T1=80*(9/5) + 491.67
+    T2= 4 *(9/5) + 491.67
+    T3=17 *(9/5) + 491.67
+    P_sc = 14.7 # Pressão na condição padrão [psia]
+    T_sc = 60 # Temperatura na condição padrão [°F]
+    TEC_marinho = 1 #[w/mk]
+    TEC_poco = 2
+    L_bomba = 1050 #m
+    L_manifold = 700 #m
+    TVDpoco = 450
+    rho_w = 1000
+    rho_ar = 1.225 #kg/m**3
+    P1 = 350 * 14.504 #psi
+    P1_bar = 350 #bar
+    P3 = 5 * 14.504 #psi
+    P3_bar = 5 #bar
+    g = 9.81 #m/s**2
+    T1 = 80 *(9/5) + 491.67
+    T2_C = 4 #°C
+    T1_F = T1 - 459.67
+    T2 = 4 *(9/5) + 491.67
+    T3 = 15 *(9/5) + 491.67
+    sigma_wg = 0.004 #N/m
+    sigma_og = 0.00841 #N/
+    thata1=math.radians(60)
+    theta2=math.radians(30)
+    theta_3 =math.radians(90)
+
+    
 
     # Gás
     Ppc, Tpc, Ppr, Tpr, z, rhog, Mg, ug, Bg = propriedades_gas_unificado(P, TR, dg, Mar, R)
