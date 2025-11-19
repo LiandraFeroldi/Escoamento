@@ -343,8 +343,30 @@ def calcular_temperaturas(
         "T_pr_vertical": T_pr_vert
     }
 
+
 #Modelo  Beggs & Brill
-    
+def vsl(ql,Ap):
+    vsl=ql/Ap
+    return vsl
+
+def vsg(qg,Ap):
+    vsg=qg/Ap
+    return vsg
+
+def vm(vsg,vsl):
+    vm=vsl+vsg
+    return vm
+
+def Holdap_no_slip(vm,vsl):
+    lambida=vsl/vm
+    return lambida
+
+def Fvm():
+    Frm=
+
+
+
+
 
 
 
