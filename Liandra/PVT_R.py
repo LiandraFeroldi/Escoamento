@@ -3,7 +3,7 @@ import numpy as np
 
 dg = 0.7 # Densidade relativa do gás
 API = 30 # Grau API
-RGL = 250 # Razão gás óleo
+RGL = 150 # Razão gás óleo
 R = 10.73 # Constante universal dos gases [ft^3.psi/°R/lb.mol]
 M_ar = 0.029 # Massa molecular do ar [kg/mol]
 P_sc = 14.7 # Pressão na condição padrão [psia]
@@ -31,7 +31,10 @@ T2 = 4 * (9/5) + 491.67
 T3 = 15 * (9/5) + 491.67
 sigma_wg = 0.004 #N/m
 sigma_og = 0.00841 #N/m
-theta = math.radians(37)
+theta1= math.radians(90)
+theta2 = math.radians(37)
+theta3 = math.radians(90)
+
 print(T1, T2, T3)
 print(P1)
 print(T1_F)
