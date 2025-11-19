@@ -5,7 +5,7 @@ import numpy as np
 
 def propriedades_pseudocriticas(dg):
     if dg < 0.75:
-        Ppc = 677 - 15.0 * dg - 37.5 * dg**2
+        Ppc = 677 + 15.0 * dg - 37.5 * dg**2
         Tpc = 168 + 325 * dg - 12.5 * dg**2
     else:
         Ppc = 706 - 51.7 * dg - 11.1 * dg**2
@@ -22,36 +22,36 @@ def fator_compressibilidade_papay(Ppr, Tpr):
     z = 1 - ((3.53 * Ppr) / (10 ** (0.9813 * Tpr))) + ((0.274 * Ppr**2) / (10 ** (0.8157 * Tpr)))
     return z
 
-def compressibilidade_gas_INSITU(P, Ppc, z, Tk, dg, Ppr, Tpr):
+def compressibilidade_gas_INSITU(P, Ppc, z, TR, dg, Ppr, Tpr):
     Mar = 28.96
     Mg = Mar * dg
     R = 10.7316
-    rhog = (P * Mg) / (z * R * Tk)
+    rhog = (P * Mg) / (z * R * TR)  #T precisa ser em º R, pois esta usando P-psia, Mg-g/mol,ESSA PARTE PRECISA ESTAR AQUI TBM?
 
     dZ_dPpr = -3.53 / (10 ** (0.9813 * Tpr)) + (2 * 0.274 * Ppr) / (10 ** (0.8157 * Tpr))
     dZ_dP = dZ_dPpr / Ppc
 
-    Cg = (1 / P) - (1 / z) * dZ_dP
+    Cg = (1 / P) - (1 / z) * dZ_dP  #ESSE P É  PPr ou p? no de termo da brenda ela usa ppr.
     return Cg, rhog, Mg
 #--------------------------------------------------------------------
 
 # Dados do gás 
 def dados_gas(Mar, dg, P, z, R, TR):
     Mg = Mar * dg
-    # T deve estar em Rankine se R=10.7316 (ft·lb/(lb·°R)) e P em psi
-    rhog = (P * Mg) / (z * R * TR)    # lb/ft3 (aprox), verifique unidades!
+    # T deve estar em Rankine se R=10.7316 (ft·lb/(lb·°R)) e P em psi  e Mg em lbm/lbmol(mar=28,96 tbm)
+    rhog = (P * Mg) / (z * R * TR)    # lb/ft3 (aprox)
     return Mg, rhog
 
-def viscosidade_gas_lee(Mg, T, rhog):
-    kv = ((9.379 + 0.0160 * Mg) * T ** 1.5) / (209.2 + 19.26 * Mg + T)
-    xv = 3.448 + (986.4 / T) + 0.01009 * Mg
+def viscosidade_gas_lee(Mg, TR, rhog):
+    kv = ((9.379 + 0.0160 * Mg) * TR ** 1.5) / (209.2 + 19.26 * Mg + TR) #T precisa ser ºR
+    xv = 3.448 + (986.4 / TR) + 0.01009 * Mg
     yv = 2.4 - 0.2 * xv
     ug = 1e-4 * kv * math.exp(xv * (rhog / 62.4) ** yv)
-    return ug
+    return ug  #vai retornar em cP
 
 def fator_formacao_gas(z, TR, P):
-    # T em Rankine, P em psi — verifique formula original
-    Bg = (14.7 / 60) * z * (TR / P)
+    # T em Rankine, P em psi — verifique formula original EM DUVIDA SOBRE UNIDADE T(F OU R)
+    Bg = (14.7 / 60) * z * (TR / P) #VI NUM ARTIGO E APARENTEMENTE USA R
     return Bg
 
 #-------------------------------------------------------------------------------------------------
@@ -59,20 +59,20 @@ def fator_formacao_gas(z, TR, P):
 def dados_oleo(Api):
     do = (141.5 / (131.5 + Api))
     rhoo=do*1000 # N SEI SE A GENTE PODE USAR ASSIM PRA ACHAR O RHO DO ÓLEO
-    return do, rhoo
+    return do, rhoo #acho q n seja a maneira adequada pq é somenete para 20ªC
 
 def obter_pressao_bolha(RGL, dg, Api, TF):
     #Correlação de Standing
     a = 0.00091 * TF - 0.0125 * Api
-    Pb = 18.8 * (((RGL / dg) ** 0.83) * 10 ** a - 1.4)
-    return Pb
+    Pb = 18.2 * (((RGL / dg) ** 0.83) * 10 ** a - 1.4) #devolve em psia
+    return Pb #PSIA
 
 def razao_solubilidade_gas_oleo(P, dg, Api, TF, Pb):
-    if P >= Pb:
-        Rs = dg * (((Pb / 18.2) + 1.4) * 10 ** (0.0125 * Api - 0.00091 * TF)) ** (1 / 0.83)
+    if P > Pb:  #TU COLOCOU O RS PRA P>=PB MAS ACHO Q É SO SE FOR MAIOR
+        Rs = dg * ((((Pb / 18.2) + 1.4) * 10 ** (0.0125 * Api - 0.00091 * TF)) ** (1 / 0.83))
     else:
-        Rs = dg * (((P / 18.2) + 1.4) * 10 ** (0.0125 * Api - 0.00091 * TF)) ** (1 / 0.83)
-    return Rs
+        Rs = dg * ((((P / 18.2) + 1.4) * 10 ** (0.0125 * Api - 0.00091 * TF)) ** (1 / 0.83))
+    return Rs #SCF/STB
 
 def fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, RGL, Co):
     Bob = 0.9759 + 0.00012 * ((RGL * ((dg / do) ** 0.5) + 1.25 * TF) ** 1.2)
@@ -80,33 +80,33 @@ def fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, RGL, Co):
         Bo = Bob * math.exp(-Co * (P - Pb))
     else:
         Bo = 0.9759 + 0.00012 * ((Rs * ((dg / do) ** 0.5) + 1.25 * TF) ** 1.2)
-    return Bo, Bob
+    return Bo, Bob #BBL/STB
 
 def massa_especifica_oleo_INSITU(Rs, dg, do, Bo, P, Pb, RGL, Co):
     if P > Pb:
         rhoob = (62.4 * do + 0.0136 * RGL * dg) / Bo
         rhoo = rhoob * math.exp(Co * (P - Pb))
-        return rhoo, rhoob
+        return rhoo, rhoob #lb/ft3
     else:
         rhoo = (62.4 * do + 0.0136 * Rs * dg) / Bo
-        return rhoo, None
+        return rhoo, None #lb/ft3
 
 def viscosidade_oleo_morto(Api, TF):
     #Viscosidade do Óleo Morto Correlação de Beggs e Robinson (1975)
     A = 10 ** (3.0324 - 0.02023 * Api)
     uom = 10 ** (A * TF ** -1.163) - 1
-    return uom
+    return uom #cP
 
-def viscosidade_oleo_saturado(P, Pb, Rs, uom):
+def viscosidade_oleo_saturado(P, Pb, Rs, uom): 
     #Viscosidade do Óleo saturado Correlação de Beggs e Robinson (1975)
     if P <= Pb:
         c = 10.715 * (Rs + 100) ** (-0.515)
         b = 5.44 * (Rs + 150) ** (-0.338)
-        uos = c * uom ** b
+        uos = c * uom ** b #cP 
     else:
         # para P > Pb use aproximação (original tinha m dependente de P)
-        m = 2.68 * (P ** 1.187) * math.exp(-11.513 - (8.98e-5) * P)
-        uos = uom * (P / Pb) ** m
+        m = 2.6 * (P ** 1.187) * math.exp(-11.513 - (8.98e-5) * P) #p- psia
+        uos = uom * (P / Pb) ** m  # N DEVE SER UOB NA PB?
     return uos
 
 def compressibilidade_oleo(P, TF, dg, do, Rs, Bo, Api, Bg, Pb, rhoob):
@@ -116,7 +116,7 @@ def compressibilidade_oleo(P, TF, dg, do, Rs, Bo, Api, Bg, Pb, rhoob):
         dRs_dP = dg * (1 / 0.83) * (((P / 18.2) + 1.4) * (10 ** (0.0125 * Api - 0.00091 * TF))) ** (1 / 0.83 - 1) * (1 / 18.2) * (10 ** (0.0125 * Api - 0.00091 * TF))
         dBo_dP = 0.00012 * 1.2 * (Rs * ((dg / do) ** 0.5) + 1.25 * TF) ** 0.2 * ((dg / do) ** 0.5) * dRs_dP
         Co = -(1 / Bo) * dBo_dP + (Bg / Bo) * dRs_dP
-    return Co
+    return Co #psia-1
 
 
 # --- Água ---
