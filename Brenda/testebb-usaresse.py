@@ -21,8 +21,9 @@ def fator_compressibilidade_papay(Ppr, Tpr):
     aa=1.39*((Tpr-0.92)**0.5)- 0.36*Tpr- 0.101
     bb=(0.62 - 0.23 * Tpr)*Ppr + ((0.066 / (Tpr - 0.86) )- 0.037) * Ppr**2 + (0.32 * Ppr**6) / (10 ** (9 * (Tpr - 1)))
     cc=0.132 - 0.32 * math.log10(Tpr)
-    dd=antilog10(0.3106 - 0.49 * Tpr + 0.1824 * Tpr**2)
-    z = aa + ((1 - aa) /math.exp(-bb)) + cc * Ppr**dd
+    D_exponente = 0.3106 - 0.49 * Tpr + 0.1824 * Tpr**2
+    dd= 10 ** D_exponente
+    z = aa + math.exp(-bb) + cc * (Ppr ** dd)
     return z
 
 def compressibilidade_gas_INSITU(P, Ppc, z, TR, dg, Ppr, Tpr):
