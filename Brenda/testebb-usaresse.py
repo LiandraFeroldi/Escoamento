@@ -16,7 +16,7 @@ def propriedades_pseudoreduzidas(P, TR, Ppc, Tpc):
     Tpr = TR/ Tpc
     return Ppr, Tpr
 
-def fator_compressibilidade_papay(Ppr, Tpr):
+def calcular_z_brill(Ppr, Tpr):
     # Fator de compressibilidade (brill e e begs)
     aa=1.39*((Tpr-0.92)**0.5)- 0.36*Tpr- 0.101
     bb=(0.62 - 0.23 * Tpr)*Ppr + ((0.066 / (Tpr - 0.86) )- 0.037) * Ppr**2 + (0.32 * Ppr**6) / (10 ** (9 * (Tpr - 1)))
@@ -26,16 +26,24 @@ def fator_compressibilidade_papay(Ppr, Tpr):
     z = aa + math.exp(-bb) + cc * (Ppr ** dd)
     return z
 
+
 def compressibilidade_gas_INSITU(P, Ppc, z, TR, dg, Ppr, Tpr):
     Mar = 28.96
     Mg = Mar * dg
     R = 10.7316
     rhog = (P * Mg) / (z * R * TR) 
+    
+    h = 0.0001 
+    
+    z_plus = calcular_z_brill(Ppr + h, Tpr) 
+    
+    # Derivada numérica: (f(x+h) - f(x)) / h
+    dZ_dPpr = (z_plus - z) / h 
+    # ---------------------------------------------
 
-    dZ_dPpr = -3.53 / (10 ** (0.9813 * Tpr)) + (2 * 0.274 * Ppr) / (10 ** (0.8157 * Tpr))
     dZ_dP = dZ_dPpr / Ppc
-
     Cg = (1 / P) - (1 / z) * dZ_dP 
+    
     return Cg, rhog, Mg
 #--------------------------------------------------------------------
 
@@ -188,7 +196,7 @@ def main(P, TR, dg, T, R, Mar, Api, RGL, TF, S):
     # GÁS
     Ppc, Tpc = propriedades_pseudocriticas(dg)
     Ppr, Tpr = propriedades_pseudoreduzidas(P, T, Ppc, Tpc)
-    z = fator_compressibilidade_papay(Ppr, Tpr)
+    z = calcular_z_brill(Ppr, Tpr)
     Cg, rhog, Mg = compressibilidade_gas_INSITU(P, Ppc, z, TR, dg, Ppr, Tpr)
     ug = viscosidade_gas_lee(Mg, TR, rhog)
     Bg = fator_formacao_gas(z, TR, P)
