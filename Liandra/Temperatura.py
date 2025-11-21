@@ -52,14 +52,3 @@ theta3 = math.radians(90)
 qlsc_d=10000 #sm³/d
 S=0
 
-
-do,rhoo=dados_oleo(Api)
-Mg,rhog=dados_gas(Mar, dg, P, z, R, TR)
-# Cálculo GÁS
-Ppc, Tpc, Ppr, Tpr, z, Cg, rhog, Mg, ug, Bg = propriedades_gas(P, T, dg)
-Api, Rs, Pb, Bo, rhoo, uom, uos, Co, Bg_oleo = propriedades_oleo(P, TF.GetValue('degF'), dg, do, Pb, Rs, z, Bob, rhoob)
-rhow, Rsw, Bw, uw=propriedades_agua(S,P,TF)
-
-qlsc=vazao_liquido_std(qlsc_d)
-qosc,qwsc,qgsc=vazao_std(qlsc,bsw,RGL)
-ql, qg = vazao_insitu(qosc,Bo,qwsc,Rs,Rsw,Bg,qgsc)
