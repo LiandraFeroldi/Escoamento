@@ -1,8 +1,7 @@
-
 import math
 import numpy as np
-   
-
+    
+# Funções de Propriedades Pseudocríticas e Reduzidas
 def propriedades_pseudocriticas(dg):
     if dg < 0.75:
         Ppc = 677 + 15.0 * dg - 37.5 * dg**2
@@ -26,53 +25,51 @@ def compressibilidade_gas_INSITU(P, Ppc, z, TR, dg, Ppr, Tpr):
     Mar = 28.96
     Mg = Mar * dg
     R = 10.7316
-    rhog = (P * Mg) / (z * R * TR)  #T precisa ser em º R, pois esta usando P-psia, Mg-g/mol,ESSA PARTE PRECISA ESTAR AQUI TBM?
+    rhog = (P * Mg) / (z * R * TR) 
 
     dZ_dPpr = -3.53 / (10 ** (0.9813 * Tpr)) + (2 * 0.274 * Ppr) / (10 ** (0.8157 * Tpr))
     dZ_dP = dZ_dPpr / Ppc
 
-    Cg = (1 / P) - (1 / z) * dZ_dP  
+    Cg = (1 / P) - (1 / z) * dZ_dP 
     return Cg, rhog, Mg
 #--------------------------------------------------------------------
 
 # Dados do gás 
 def dados_gas(Mar, dg, P, z, R, TR):
     Mg = Mar * dg
-    # T deve estar em Rankine se R=10.7316 (ft·lb/(lb·°R)) e P em psi  e Mg em lbm/lbmol(mar=28,96 tbm)
-    rhog = (P * Mg) / (z * R * TR)    # lb/ft3 (aprox)
+    rhog = (P * Mg) / (z * R * TR) 
     return Mg, rhog
 
 def viscosidade_gas_lee(Mg, TR, rhog):
-    kv = ((9.379 + 0.0160 * Mg) * TR ** 1.5) / (209.2 + 19.26 * Mg + TR) #T precisa ser ºR
+    kv = ((9.379 + 0.0160 * Mg) * TR ** 1.5) / (209.2 + 19.26 * Mg + TR) 
     xv = 3.448 + (986.4 / TR) + 0.01009 * Mg
     yv = 2.4 - 0.2 * xv
     ug = 1e-4 * kv * math.exp(xv * (rhog / 62.4) ** yv)
-    return ug  #vai retornar em cP
+    return ug 
 
 def fator_formacao_gas(z, TR, P):
-    # T em Rankine, P em psi — verifique formula original EM DUVIDA SOBRE UNIDADE T(F OU R)
-    Bg = (14.7 / 519.67) * z * (TR / P) #VI NUM ARTIGO E APARENTEMENTE USA R (ajustadndo pois deve se usar psia com R)
+    Bg = (14.7 / 519.67) * z * (TR / P) 
     return Bg
 
 #-------------------------------------------------------------------------------------------------
 # PROPRIEDADES DO ÓLEO
 def dados_oleo(Api):
     do = (141.5 / (131.5 + Api))
-    rhoo=do*1000 # N SEI SE A GENTE PODE USAR ASSIM PRA ACHAR O RHO DO ÓLEO
-    return do, rhoo #acho q n seja a maneira adequada pq é somenete para 20ªC
+    rhoo=do*1000 
+    return do, rhoo 
 
 def obter_pressao_bolha(RGL, dg, Api, TF):
     #Correlação de Standing
     a = 0.00091 * TF - 0.0125 * Api
-    Pb = 18.2 * (((RGL / dg) ** 0.83) * 10 ** a - 1.4) #devolve em psia
-    return Pb #PSIA
+    Pb = 18.2 * (((RGL / dg) ** 0.83) * 10 ** a - 1.4) 
+    return Pb 
 
 def razao_solubilidade_gas_oleo(P, dg, Api, TF, Pb):
-    if P > Pb:  #TU COLOCOU O RS PRA P>=PB MAS ACHO Q É SO SE FOR MAIOR
+    if P > Pb: 
         Rs = dg * ((((Pb / 18.2) + 1.4) * 10 ** (0.0125 * Api - 0.00091 * TF)) ** (1 / 0.83))
     else:
         Rs = dg * ((((P / 18.2) + 1.4) * 10 ** (0.0125 * Api - 0.00091 * TF)) ** (1 / 0.83))
-    return Rs #SCF/STB
+    return Rs 
 
 def fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, RGL, Co):
     Bob = 0.9759 + 0.00012 * ((RGL * ((dg / do) ** 0.5) + 1.25 * TF) ** 1.2)
@@ -80,43 +77,54 @@ def fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, RGL, Co):
         Bo = Bob * math.exp(-Co * (P - Pb))
     else:
         Bo = 0.9759 + 0.00012 * ((Rs * ((dg / do) ** 0.5) + 1.25 * TF) ** 1.2)
-    return Bo, Bob #BBL/STB
+    return Bo, Bob 
 
 def massa_especifica_oleo_INSITU(Rs, dg, do, Bo, P, Pb, RGL, Co):
     if P > Pb:
-        rhoob = (62.4 * do + 0.0136 * RGL * dg) / Bo
+        # Calcular Bob para garantir que rhoob seja calculado corretamente,
+        # pois Bob deve usar RGL, não Rs.
+        Bob_for_rhoob = 0.9759 + 0.00012 * ((RGL * ((dg / do) ** 0.5) + 1.25 * TF) ** 1.2)
+        rhoob = (62.4 * do + 0.0136 * RGL * dg) / Bob_for_rhoob
         rhoo = rhoob * math.exp(Co * (P - Pb))
-        return rhoo, rhoob #lb/ft3
+        return rhoo, rhoob 
     else:
         rhoo = (62.4 * do + 0.0136 * Rs * dg) / Bo
-        return rhoo, None #lb/ft3
+        return rhoo, None 
 
 def viscosidade_oleo_morto(Api, TF):
     #Viscosidade do Óleo Morto Correlação de Beggs e Robinson (1975)
     A = 10 ** (3.0324 - 0.02023 * Api)
     uom = 10 ** (A * TF ** -1.163) - 1
-    return uom #cP
+    return uom 
 
 def viscosidade_oleo_saturado(P, Pb, Rs, uom): 
     #Viscosidade do Óleo saturado Correlação de Beggs e Robinson (1975)
     if P <= Pb:
         c = 10.715 * (Rs + 100) ** (-0.515)
         b = 5.44 * (Rs + 150) ** (-0.338)
-        uos = c * uom ** b #cP 
+        uos = c * uom ** b 
     else:
-        # para P > Pb use aproximação (original tinha m dependente de P)
-        m = 2.6 * (P ** 1.187) * math.exp(-11.513 - (8.98e-5) * P) #p- psia
-        uos = uom * (P / Pb) ** m  # N DEVE SER UOB NA PB?
+        # P > Pb: usa viscosidade na pressão de bolha (uob)
+        Rs_pb = Rs # Rs em Pb é igual a RGL
+        c_pb = 10.715 * (Rs_pb + 100) ** (-0.515) 
+        b_pb = 5.44 * (Rs_pb + 150) ** (-0.338)
+        uob = c_pb * uom ** b_pb
+        
+        m = 2.6 * (P ** 1.187) * math.exp(-11.513 - (8.98e-5) * P) 
+        uos = uob * (P / Pb) ** m 
     return uos
 
-def compressibilidade_oleo(P, TF, dg, do, Rs, Bo, Api, Bg, Pb, rhoob):
+def compressibilidade_oleo(P, TF, dg, do, Rs, Bob, Api, Bg, Pb, rhoob):
     if P >= Pb:
+        # Assumindo que rhoob é a densidade na pressão de bolha e Bob é o FVF na bolha
         Co = (10**-6 )* np.exp((rhoob + 0.004347 * (P - Pb) - 79.1) / (0.0007141 * (P - Pb) - 12.938))
     else:
+        # Correlação de Standing para dRs/dP
+        # Usamos Bob, pois Bo=Bob na região P <= Pb 
         dRs_dP = dg * (1 / 0.83) * (((P / 18.2) + 1.4) * (10 ** (0.0125 * Api - 0.00091 * TF))) ** (1 / 0.83 - 1) * (1 / 18.2) * (10 ** (0.0125 * Api - 0.00091 * TF))
         dBo_dP = 0.00012 * 1.2 * (Rs * ((dg / do) ** 0.5) + 1.25 * TF) ** 0.2 * ((dg / do) ** 0.5) * dRs_dP
-        Co = -(1 / Bo) * dBo_dP + (Bg / Bo) * dRs_dP
-    return Co #psia-1
+        Co = -(1 / Bob) * dBo_dP + (Bg / Bob) * dRs_dP
+    return Co 
 
 
 # --- Água ---
@@ -154,7 +162,7 @@ def Volume_formacao_agua(P, TF):
     termo4 = -2.25341e-10 * (P**2)
     delta_Vwp = termo1 + termo2 + termo3 + termo4
     Bw = (1 + delta_VwT) * (1 + delta_Vwp)
-    return Bw  #bbl/stb
+    return Bw 
 
 def viscosidade_agua(P, TF, S):
     A0 = 109.527
@@ -174,173 +182,88 @@ def viscosidade_agua(P, TF, S):
     uw = mu_w1 * pressao_factor
     return uw 
 
+# ====================================================================================
 
-#====================================================================================
-
-def propriedades_gas(P, TR, dg,T,R, Mar):
-    Ppc, Tpc = propriedades_pseudocriticas(dg)
-    Ppr, Tpr = propriedades_pseudoreduzidas(P, T, Ppc, Tpc)
-    z = fator_compressibilidade_papay(Ppr, Tpr)
-    Mg, rhog=dados_gas(Mar, dg, P, z, R, TR)
-    ug = viscosidade_gas_lee(Mg, TR, rhog)
-    Bg = fator_formacao_gas(z, TR, P)
-    return Ppc, Tpc, Ppr, Tpr, z, rhog, Mg, ug, Bg
-
-def propriedades_oleo(P, TF, dg, do, Pb, Rs, z, Bob, rhoob):
-    Bg = fator_formacao_gas(z, TF, P)
-    Bo = fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, Bob)
-    rhoo = massa_especifica_oleo_INSITU(Rs, dg, do, Bo, P, Pb, rhoob)
-    uos = viscosidade_oleo_saturado(P, Pb, Rs)
-
-    return Api, Rs, Pb, Bo, rhoo, uos, Bg
-
-def propriedades_agua(S,P,TF):
-    rhow=massa_especifica_agua(S)
-    Rsw=Razao_de_Solubilidade_agua(P,TF)
-    Bw=Volume_formacao_agua(P,TF)
-    uw=viscosidade_agua(P,TF,S)
-
-    return rhow, Rsw, Bw, uw
-#---------------------------------------------------------------
-
-
-#---------Dados de entrada---------------------------------------------------------
-def propriedades_gas(P, T, dg):
+# FUNÇÃO MAIN CORRIGIDA
+# Recebe todos os argumentos necessários
+def main(P, TR, dg, T, R, Mar, Api, RGL, TF, S):
+    # GÁS
     Ppc, Tpc = propriedades_pseudocriticas(dg)
     Ppr, Tpr = propriedades_pseudoreduzidas(P, T, Ppc, Tpc)
     z = fator_compressibilidade_papay(Ppr, Tpr)
     Cg, rhog, Mg = compressibilidade_gas_INSITU(P, Ppc, z, TR, dg, Ppr, Tpr)
-    ug = viscosidade_gas_lee(Mg, T, rhog)
-    Bg = fator_formacao_gas(z, T, P)
-    return Ppc, Tpc, Ppr, Tpr, z, Cg, rhog, Mg, ug, Bg
+    ug = viscosidade_gas_lee(Mg, TR, rhog)
+    Bg = fator_formacao_gas(z, TR, P)
 
-def propriedades_oleo(P, TF, dg, do, Pb, Rs, z, Bob, rhoob):
-
-    Bg = fator_formacao_gas(z, TF, P)
-    Co = compressibilidade_oleo(P, TF, dg, do, Rs, Bob, z, Api, Bg, Pb, rhoob)
-    Bo = fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, Bob, Co)
-    rhoo = massa_especifica_oleo_INSITU(Rs, dg, do, Bo, P, Pb, rhoob, Co)
-    uom = viscosidade_oleo_morto(Api, TF)
-    uos = viscosidade_oleo_saturado(P, Pb, Rs, uom)
-
-    return Api, Rs, Pb, Bo, rhoo, uom, uos, Co, Bg, Rs,
-
-def propriedades_gas_unificado(P, TF_degR, dg, Mar, R):
-    Ppc, Tpc = propriedades_pseudocriticas(dg)
-    Ppr, Tpr = propriedades_pseudoreduzidas(P, TF_degR, Ppc, Tpc)
-    z = fator_compressibilidade_papay(Ppr, Tpr)
-    Mg, rhog = dados_gas(Mar, dg, P, z, R, TF_degR)
-    ug = viscosidade_gas_lee(Mg, TF_degR, rhog)
-    Bg = fator_formacao_gas(z, TF_degR, P)
-    return Ppc, Tpc, Ppr, Tpr, z, rhog, Mg, ug, Bg
-
-# ------------------ Bloco principal (exemplo de uso coerente) ------------------
-if __name__ == "__main__":
-    dg = 0.75
-    qlsc_d = 10000.0  # sm3/d 
-    bsw = 0.3
-    RGL = 150.0
-    Api = 25.0
-    S = 0.0
-    T=80
-    TF =176
-    TR= 635.67
-    Tk=353.15
-    P = 7977.08   # psi (verifique se é psi mesmo)
-    Mar = 28.96
-    R = 10.7316
-    d= 6 * 0.0254 # diâmetro m
-    e = 3 * 10**(-6)
-    T_sup=17 #C
-    T1=80*(9/5) + 491.67
-    T2= 4 *(9/5) + 491.67
-    T3=17 *(9/5) + 491.67
-    P_sc = 14.7 # Pressão na condição padrão [psia]
-    T_sc = 60 # Temperatura na condição padrão [°F]
-    TEC_marinho = 1 #[w/mk]
-    TEC_poco = 2
-    L_bomba = 1050 #m
-    L_manifold = 700 #m
-    TVDpoco = 450
-    rho_w = 1000
-    rho_ar = 1.225 #kg/m**3
-    P1 = 350 * 14.504 #psi
-    P1_bar = 350 #bar
-    P3 = 5 * 14.504 #psi
-    P3_bar = 5 #bar
-    g = 9.81 #m/s**2
-    T1 = 80 *(9/5) + 491.67
-    T2_C = 4 #°C
-    T1_F = T1 - 459.67
-    T2 = 4 *(9/5) + 491.67
-    T3 = 15 *(9/5) + 491.67
-    sigma_wg = 0.004 #N/m
-    sigma_og = 0.00841 #N/
-    thata1=math.radians(60)
-    theta2=math.radians(30)
-    theta_3 =math.radians(90)
-
-    #o que eu faria para chamar as funções: (Brenda)
-    def main(P, TR, dg,T,R, Mar):
-        #gas
-        Ppc, Tpc = propriedades_pseudocriticas(dg)
-        Ppr, Tpr = propriedades_pseudoreduzidas(P, T, Ppc, Tpc)
-        z = fator_compressibilidade_papay(Ppr, Tpr)
-        Cg, rhog, Mg=compressibilidade_gas_INSITU(P, Ppc, z, TR, dg, Ppr, Tpr)
-        ug = viscosidade_gas_lee(Mg, TR, rhog)
-        Bg = fator_formacao_gas(z, TR, P)
-
-        #oleo
-        do=dados_oleo(Api)
-        Pb=obter_pressao_bolha(RGL,dg,Api,TF)
-        Rs=razao_solubilidade_gas_oleo(P,dg,Api,TF,Pb)
-        Bo,Bob=fator_volume_formacao_oleo(Rs,dg,do,TF,P,Pb,RGL,Co)
-        rhoo,rhoob=massa_especifica_oleo_INSITU(Rs,dg,do,Bo,P,Pb,RGL, Co)
-        uom=viscosidade_oleo_morto(Api,TF)
-        uos=viscosidade_oleo_saturado(P,Pb,Rs,uom)
-        Co=compressibilidade_oleo(P, TF, dg, do, Rs, Bo, Api, Bg, Pb, rhoob) 
-
-        #agua
-        rhow=massa_especifica_agua(S)
-        Rsw=Razao_de_Solubilidade_agua(P,TF)
-        Bw=Volume_formacao_agua(P,TF)
-        uw=viscosidade_agua(P,TF,S)
-        return Ppc, Tpc, Ppr, Tpr, z, Cg, rhog, Mg, ug, Bg, do, Rs, Pb, Bo,Bob, rhoo,rhoob, uom, uos, Co, rhow, Rsw, Bw, uw
-    
-    # CHAMADA DA FUNÇÃO
-    resultados = main(P, TR, dg, T, R, Mar)
-    
-    # Desempacota o resultado para um print mais legível
-    (Ppc, Tpc, Ppr, Tpr, z, Cg, rhog, Mg, ug, Bg, 
-     do, Rs, Pb, Bo, Bob, rhoo, rhoob, uom, uos, Co, 
-     rhow, Rsw, Bw, uw) = resultados
-    print("gás: Ppc, Tpc, Ppr, Tpr, z, Cg, rhog, Mg, ug, Bg =", Ppc, Tpc, Ppr, Tpr, z, Cg, rhog, Mg, ug, Bg)
-    print("óleo: do, Rs, Pb, Bo, Bob, rhoo, rhoob, uom, uos, Co =", do, Rs, Pb, Bo, Bob, rhoo, rhoob, uom, uos, Co)
-    print("água: rhow, Rsw, Bw, uw =", rhow, Rsw, Bw, uw)
-
-#--------------------------------------------------------------------------------------------------------------------
-    
-
-    # Gás
-    Ppc, Tpc, Ppr, Tpr, z, rhog, Mg, ug, Bg = propriedades_gas_unificado(P, TR, dg, Mar, R)
-    print("gás: z, rhog, Mg, ug, Bg =", z, rhog, Mg, ug, Bg)
-
-    # Óleo - calcular do (densidade relativa) e rhoo base
-    do, rhoo_kg_m3 = dados_oleo(Api)
-    # Escolher: usar Pb calculado por Standing com RGL ou calcular Rs primeiro.
+    # ÓLEO - FLUXO DE CÁLCULO AJUSTADO
+    do = dados_oleo(Api)
     Pb = obter_pressao_bolha(RGL, dg, Api, TF)
     Rs = razao_solubilidade_gas_oleo(P, dg, Api, TF, Pb)
-    Bo, Bob = fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, RGL)
-    rhoo, rhoob = massa_especifica_oleo_INSITU(Rs, dg, do, Bo, P, Pb, RGL)
     uom = viscosidade_oleo_morto(Api, TF)
-    uos = viscosidade_oleo_saturado(P, Pb, Rs, uom)
-    print("óleo: Pb, Rs, Bo, rhoo, uom, uos =", Pb, Rs, Bo, rhoo, uom, uos)
 
-    # Água
+    # 1. Calcule Bob e rhoob (necessários para Co na região P > Pb)
+    Bob_calc = 0.9759 + 0.00012 * ((RGL * ((dg / do) ** 0.5) + 1.25 * TF) ** 1.2)
+    rhoob_calc = (62.4 * do + 0.0136 * RGL * dg) / Bob_calc
+    
+    # 2. Calcule Co (Compressibilidade do Óleo)
+    Co = compressibilidade_oleo(P, TF, dg, do, Rs, Bob_calc, Api, Bg, Pb, rhoob_calc) 
+    
+    # 3. Use Co para calcular Bo e rhoo
+    Bo, Bob = fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, RGL, Co)
+    rhoo, rhoob = massa_especifica_oleo_INSITU(Rs, dg, do, Bo, P, Pb, RGL, Co)
+    uos = viscosidade_oleo_saturado(P, Pb, Rs, uom)
+
+    # ÁGUA
     rhow = massa_especifica_agua(S)
     Rsw = Razao_de_Solubilidade_agua(P, TF)
     Bw = Volume_formacao_agua(P, TF)
     uw = viscosidade_agua(P, TF, S)
-    print("água: rhow, Rsw, Bw, uw =", rhow, Rsw, Bw, uw)
 
+    # Retorna todos os valores calculados, incluindo Co
+    return Ppc, Tpc, Ppr, Tpr, z, Cg, rhog, Mg, ug, Bg, do, Rs, Pb, Bo,Bob, rhoo,rhoob, uom, uos, Co, rhow, Rsw, Bw, uw
+
+# ---------------------------------------------------------------
+
+
+#---------Dados de entrada e Chamada da Função---------------------------------------------------------
+if __name__ == "__main__":
+    # DADOS DE ENTRADA DO USUÁRIO
+    dg = 0.75
+    RGL = 150.0
+    Api = 25.0
+    S = 0.0 # Salinidade
+    TF = 176.0 # Temperatura em °F (Reservatório)
+    TR = 176.0 + 459.67 # Temperatura em °R (para as correlações de gás)
+    T = TR # T usado em propriedades_pseudoreduzidas deve ser em Rankine
+    P = 7977.08 # Pressão [psia]
+    Mar = 28.96 #lb/lb.mol
+    R = 10.7316
     
+    # Outras variáveis definidas no seu bloco original (mantidas, mas não passadas para main)
+    # qlsc_d, bsw, Tk, d, e, T_sup, T1, T2, T3, P_sc, T_sc, TEC_marinho, TEC_poco, L_bomba, L_manifold, TVDpoco, rho_w, rho_ar, P1, P1_bar, P3, P3_bar, g, T2_C, T1_F, sigma_wg, sigma_og, thata1, theta2, theta_3
+
+    # CHAMADA DA FUNÇÃO com todos os argumentos
+    resultados = main(P, TR, dg, T, R, Mar, Api, RGL, TF, S)
+    
+    # Desempacota o resultado para o print
+    (Ppc, Tpc, Ppr, Tpr, z, Cg, rhog, Mg, ug, Bg, 
+     do, Rs, Pb, Bo, Bob, rhoo, rhoob, uom, uos, Co, 
+     rhow, Rsw, Bw, uw) = resultados
+    
+    # PRINTS FINAIS
+    print("=" * 60)
+    print("           RESULTADOS DAS PROPRIEDADES PVT           ")
+    print("=" * 60)
+    
+    print("\n## GÁS")
+    print(f"Ppc={Ppc:.2f} psia, Tpc={Tpc:.2f} °R, Ppr={Ppr:.3f}, Tpr={Tpr:.3f}, z={z:.4f}")
+    print(f"Cg={Cg:.2e} psi⁻¹, rhog={rhog:.3f} lb/ft³, Mg={Mg:.2f}lb/lb.mol, ug={ug:.3e} cP, Bg={Bg:.4e} ft³/SCF")
+    
+    print("\n## ÓLEO")
+    print(f"do={do:.3f}, Rs={Rs:.2f} SCF/STB, Pb={Pb:.2f} psia")
+    print(f"Bo={Bo:.4f} bbl/STB, Bob={Bob:.4f} bbl/STB")
+    print(f"rhoo={rhoo:.3f} lb/ft³, uom={uom:.3f} cP, uos={uos:.3f} cP, Co={Co:.2e} psi⁻¹")
+    
+    print("\n## ÁGUA")
+    print(f"rhow={rhow:.3f} lb/ft³, Rsw={Rsw:.2f} SCF/STB, Bw={Bw:.4f} bbl/STB, uw={uw:.3f} cP")
+    print("-" * 60)

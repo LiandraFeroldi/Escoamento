@@ -196,7 +196,7 @@ def main(P, TR, dg, T, R, Mar, Api, RGL, TF, S):
     Bg = fator_formacao_gas(z, TR, P)
 
     # ÓLEO - FLUXO DE CÁLCULO AJUSTADO
-    do, rhoo_dummy = dados_oleo(Api)
+    do = dados_oleo(Api)
     Pb = obter_pressao_bolha(RGL, dg, Api, TF)
     Rs = razao_solubilidade_gas_oleo(P, dg, Api, TF, Pb)
     uom = viscosidade_oleo_morto(Api, TF)
