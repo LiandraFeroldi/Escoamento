@@ -160,17 +160,18 @@ for step in sections:
     T_amb_K = T_amb_C + 273.15
     T_old_K = (T_atual_R - 491.67) * 5.0/9.0 + 273.15
     theta_rad = math.radians(theta)
-    
-    # Termo A (Fonte de Calor Potencial)
+
+    # Termo A (Fonte de Calor Potencial - qm * g * sin(theta) / TEC)
     term_A = (qm_kg_s * 9.81 * math.sin(theta_rad)) / TEC_linear
-    
-    # Termo Exponencial (Relaxamento Térmico)
+
+    # Termo Exponencial (Relaxamento Térmico - exp(-TEC * dL / (qm * Cp)))
     arg_exp = (TEC_linear * dL) / (qm_kg_s * Cp_oleo)
     fator_exp = math.exp(-arg_exp)
-    
-    # Aplicação da Fórmula
-    T_new_K = T_amb_K - term_A + (T_old_K - T_amb_K + term_A) * fator_exp
-    
+
+    # Aplicação da Fórmula: T_novo = (T_amb - TermoA) - Exp * (T_amb - TermoA - T_old)
+    # Esta linha implementa a fórmula da sua imagem:
+    T_new_K = (T_amb_K - term_A) - fator_exp * (T_amb_K - term_A - T_old_K)
+
     # Converte de volta para Rankine
     T_new_C = T_new_K - 273.15
     T_new_R = (T_new_C * 9.0/5.0) + 491.67
@@ -247,7 +248,7 @@ ax3.grid(True)
 ax3.set_ylim(0, 1.1)
 
 # 4. Fatores Volume (Bo e Bg)
-ax4.plot(df["L_m"], df["Bo"], 'b-', label='Bo')
+ax4.plot(df["L_m"], df["Bo"] / 0.1589873, 'b-', label='Bo')
 ax4.set_xlabel('Comprimento (m)')
 ax4.set_ylabel('Bo', color='b')
 ax4.tick_params(axis='y', labelcolor='b')
@@ -255,7 +256,7 @@ ax4.set_title('Fatores Volume (Bo e Bg)')
 ax4.grid(True)
 
 ax4_twin = ax4.twinx()
-ax4_twin.plot(df["L_m"], df["Bg"], 'r--', label='Bg')
+ax4_twin.plot(df["L_m"], df["Bg"]/ 0.1589873, 'r--', label='Bg')
 ax4_twin.set_ylabel('Bg', color='r')
 ax4_twin.tick_params(axis='y', labelcolor='r')
 
