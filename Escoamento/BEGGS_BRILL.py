@@ -2,8 +2,6 @@
 import math
 import numpy as np
 import PVT_OFICIAL
-
-# -------------------------
 # constantes e utilitários
 # -------------------------
 g = 9.81
@@ -33,8 +31,8 @@ CEFG_TABLE_ASC = {
 }
 
 # ----------------------------------------------------------------
-# funções auxiliares Beggs & Brill (L_params, friction, regime ...)
-# ----------------------------------------------------------------
+# funções auxiliares Beggs & Brill (L_params, friction, regime)
+
 def L_params(lambda_L):
     L1 = 316.0      * (lambda_L**0.302)
     L2 = 0.0009252  * (lambda_L**-2.4684)
@@ -43,7 +41,6 @@ def L_params(lambda_L):
     return L1, L2, L3, L4
 
 def friction_factor_hall(eps, D, Re):
-    # implementação Hall-like estável (aproximação utilizada antes)
     term = 2e4 * (eps / (D + EPS)) + 1e6 / (Re + EPS)
     return 0.0055 * (1+  (term ** (1/3)))
 
@@ -85,17 +82,8 @@ def psi_inclination(C, theta_deg):
 
 # ----------------------------------------
 # função de velocidades (robusta e clara)
-# ----------------------------------------
+
 def velocities_from_q_sm3d(Q_st_sm3d, D, Bo, Rs, RGL, Bg, BSW, Bw=1.0):
-    """
-    Q_st_sm3d: std m3/day
-    Bo: oil FVF (m3/m3)
-    Rs: solubilidade (std m3 gas per std m3 oil) OR units consistent with your PVT
-    RGL: surface GLR (std m3 gas / std m3 oil)
-    Bg: gas FVF at conditions (m3 gas in-situ per std m3 gas)
-    BSW: water cut fraction (std)
-    Bw: water FVF (m3/m3)
-    """
     Q_m3s = sm3d_to_m3s(Q_st_sm3d)
     q_oil_std = Q_m3s * (1.0 - BSW)
     q_water_std = Q_m3s * BSW
@@ -116,8 +104,8 @@ def velocities_from_q_sm3d(Q_st_sm3d, D, Bo, Rs, RGL, Bg, BSW, Bw=1.0):
     return Vsl, Vsg, Vm, q_liq_insitu, q_gas_insitu
 
 # -------------------------------------------------------
-# Função pública que o MAIN_SIMULATOR espera (calc_gradient)
-# -------------------------------------------------------
+# Função que o MAIN_SIMULATOR espera (calc_gradient)
+
 def calc_gradient(Q_st_sm3d, D, eps, theta_deg, P_psia, T_R, pvt_inputs, BSW=0.30):
     """
     Interface compatível com MAIN_SIMULATOR:
@@ -147,7 +135,6 @@ def calc_gradient(Q_st_sm3d, D, eps, theta_deg, P_psia, T_R, pvt_inputs, BSW=0.3
 
     # -------------------------
     # 2) conversões SI
-    # -------------------------
     rho_o = lbft3_to_kgm3(rhoo_lb)
     rho_g = lbft3_to_kgm3(rhog_lb)
     rho_w = lbft3_to_kgm3(rhow_lb)
@@ -160,7 +147,6 @@ def calc_gradient(Q_st_sm3d, D, eps, theta_deg, P_psia, T_R, pvt_inputs, BSW=0.3
 
     # -------------------------
     # 3) Extrair RGL do pvt_inputs (robusto)
-    # -------------------------
     RGL = None
     if isinstance(pvt_inputs, (list, tuple)) and len(pvt_inputs) > 5:
         # heurística: posição 5 costuma ser RGL nas versões anteriores do MAIN
@@ -188,17 +174,16 @@ def calc_gradient(Q_st_sm3d, D, eps, theta_deg, P_psia, T_R, pvt_inputs, BSW=0.3
 
     # ------------------------------------------------
     # 4) Velocidades e vazões in-situ
-    # ------------------------------------------------
+
     Vsl, Vsg, Vm, q_liq_insitu, q_gas_insitu = velocities_from_q_sm3d(
         Q_st_sm3d, D, Bo, Rs, RGL, Bg, BSW, Bw
     )
 
     # ------------------------------------------------
     # 5) No-slip mixture properties e Fr
-    # ------------------------------------------------
+
     lambda_L = lambda_no_slip(Vsl, Vm)
-    # densidade do líquido in-situ por mistura volumétrica (óleo+água)
-    # volumefractions in liquid phase (approx)
+
     vol_oil = ( (Q_m3s := sm3d_to_m3s(Q_st_sm3d)) * (1 - BSW) * Bo ) / (q_liq_insitu + EPS)
     vol_water = 1.0 - vol_oil
     rho_liq_insitu = 1.0 / ( (vol_oil/(rho_o + EPS)) + (vol_water/(rho_w + EPS)) )
@@ -217,7 +202,7 @@ def calc_gradient(Q_st_sm3d, D, eps, theta_deg, P_psia, T_R, pvt_inputs, BSW=0.3
 
     # ------------------------------------------------
     # 6) HLo (raw) e aplicação da regra HLo > lambda_L
-    # ------------------------------------------------
+
     if regime == "transition":
         HLo_seg_raw = compute_HLo_raw(lambda_L, Frm2, "segregated")
         HLo_int_raw = compute_HLo_raw(lambda_L, Frm2, "intermittent")
@@ -255,7 +240,7 @@ def calc_gradient(Q_st_sm3d, D, eps, theta_deg, P_psia, T_R, pvt_inputs, BSW=0.3
 
     # ------------------------------------------------
     # 8) Densidade Slip e Re, fator de atrito
-    # ------------------------------------------------
+
     rho_slip = rho_liq_insitu * HL + rho_g * (1 - HL)
     Re_ns = max(rho_ns * Vm * D / (mu_ns + EPS), 1e-9)
     f_n = friction_factor_hall(eps, D, Re_ns)
@@ -277,11 +262,10 @@ def calc_gradient(Q_st_sm3d, D, eps, theta_deg, P_psia, T_R, pvt_inputs, BSW=0.3
 
     # ---------------
     # 9) termo de aceleração Ek e dp_total (Pa/m)
-    # ---------------
     P_abs_Pa = P_psia * 6894.76  # psia -> Pa
     Ek = (rho_slip * Vm * Vsg) / (P_abs_Pa + EPS)
     dp_total = (dp_fric + dp_grav) / max(1.0 - Ek, 1e-6)   # Pa/m, positivo = perda subindo
 
     # Retorna na ordem que o MAIN espera:
-    # dp_total (Pa/m), HL, regime (string), Bg (m3/std per std), Bo (m3/m3), rho_slip (kg/m3)
+    # dp_total (Pa/m), HL, regime, Bg (m3/std per std), Bo (m3/m3), rho_slip (kg/m3)
     return dp_total, HL, regime, Bg, Bo, rho_slip

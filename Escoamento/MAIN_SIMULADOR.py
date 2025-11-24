@@ -4,51 +4,38 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Importação dos módulos auxiliares (certifique-se que estão na mesma pasta)
 import PVT_OFICIAL
 import BEGGS_BRILL as BB
 
-# ============================================================================
-# 1. DADOS DE ENTRADA (BASEADO NO PDF - GRUPO 2)
+# 1. DADOS DE ENTRADA 
 # ============================================================================
 print("--- INICIANDO SIMULAÇÃO GRUPO 2 ---")
-
 # --- Fluido ---
 Q_std_d = 10000.0       # sm3/d (Meta de produção)
 BSW = 0.30              # 30%
 RGL = 150.0             # sm3/sm3
 API = 25.0              # Grau API
 dg = 0.75               # Gravidade específica gás
-
-# Cálculo da densidade relativa do óleo (necessário para o Cp das meninas)
 do = 141.5 / (API + 131.5) 
-
 # --- Reservatório (Condição de Contorno Inicial - Fundo) ---
 P_res_bar = 550.0       # bar
 T_res_C = 80.0          # °C
-
 # --- Geometria do Duto ---
 D_pol = 3               # Diâmetro (suposição padrão, ajuste se necessário)
 D_m = D_pol * 0.0254    # m
 Rugosidade = 4.5e-5     # m (Aço carbono típico)
-
 # --- Propriedades Térmicas ---
-# O Cp será calculado dinamicamente no loop
 TEC_poco = 2.0          # W/m.K (Linear)
 TEC_marinho = 1.0       # W/m.K (Linear)
-
 # --- Temperaturas Ambientais (Condições de Contorno Externas) ---
 T_fundo_mar_C = 4.0     # °C
 T_superficie_C = 17.0   # °C
 
-# ============================================================================
-# 2. DEFINIÇÃO DA TOPOLOGIA (GEOMETRIA DO SISTEMA)
+# 2.GEOMETRIA DO SISTEMA
 # ============================================================================
 # Discretização (tamanho do passo de cálculo)
 dL_step = 10.0 # metros (quanto menor, mais preciso)
-
 sections = []
-
 # --- TRECHO 1: POÇO (Reservatório -> ANM) ---
 L_poco = 2100 - 950
 n_steps1 = int(L_poco / dL_step)
@@ -76,7 +63,6 @@ for i in range(n_steps3):
     T_amb = 4.0 + (17.0 - 4.0) * frac
     sections.append({"theta": 90.0, "T_amb_C": T_amb, "TEC": TEC_marinho, "dL": dL_step})
 
-# ============================================================================
 # 3. LOOP DE SIMULAÇÃO (MARCHA PxT)
 # ============================================================================
 
@@ -84,11 +70,9 @@ for i in range(n_steps3):
 P_atual_psia = P_res_bar * 14.5038
 T_atual_R = (T_res_C * 9.0/5.0) + 491.67
 L_acumulado = 0.0
-
 # Cálculo inicial do Pb para o ponto de partida
 TF_start = T_atual_R - 459.67
 Pb_inicial_psia = PVT_OFICIAL.obter_pressao_bolha(RGL, dg, API, TF_start)
-
 # Listas para armazenar resultados (para gráficos e Excel)
 dados_simulacao = {
     "L_m": [0.0],
@@ -98,10 +82,9 @@ dados_simulacao = {
     "Regime": ["N/A"],
     "Bo": [0.0],
     "Bg": [0.0],
-    "Pb_bar": [Pb_inicial_psia / 14.5038] # NOVA COLUNA: Pressão de Bolha
+    "Pb_bar": [Pb_inicial_psia / 14.5038] # Pressão de Bolha
 }
-
-# Vazão Mássica Aproximada (para equação de temperatura)
+# Vazão Mássica Aproximada
 q_m3s = Q_std_d / 86400.0
 qm_kg_s = q_m3s * 850.0 # Estimativa inicial
 
@@ -128,12 +111,12 @@ for step in sections:
     dp_psi_m = dp_total_Pa_m * 1.45038e-4
     P_new_psia = P_atual_psia - (dp_psi_m * dL)
     
-    # --- B. CÁLCULO TÉRMICO (Fórmula da Imagem + Cp das Meninas) ---
+    # --- B. CÁLCULO TÉRMICO  ---
     T_amb_K = T_amb_C + 273.15
     T_old_K = (T_atual_R - 491.67) * 5.0/9.0 + 273.15
     theta_rad = math.radians(theta)
 
-    # CÁLCULO DO Cp (IGUAL AO DELAS)
+    # CÁLCULO DO Cp 
     Cp_kJ = ((2e-3) * T_amb_C - 1.429) * do + (2.67e-3) * T_amb_C + 3.049
     Cp_oleo = Cp_kJ * 1000.0 # Converte kJ para J
 
@@ -167,7 +150,6 @@ for step in sections:
     dados_simulacao["Bg"].append(Bg)
     dados_simulacao["Pb_bar"].append(Pb_atual_psia / 14.5038)
 
-# ============================================================================
 # 4. RESULTADOS, RELATÓRIO E GRÁFICOS
 # ============================================================================
 df = pd.DataFrame(dados_simulacao)

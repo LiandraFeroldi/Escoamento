@@ -74,7 +74,6 @@ def fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, RGL, Co):
         Bo = 0.9759 + 0.00012 * ((Rs * ((dg / do) ** 0.5) + 1.25 * TF) ** 1.2)
     return Bo, Bob 
 
-# CORRIGIDO: TF adicionado como argumento
 def massa_especifica_oleo_INSITU(Rs, dg, do, Bo, P, Pb, RGL, Co, TF):
     if P > Pb:
         Bob_for_rhoob = 0.9759 + 0.00012 * ((RGL * ((dg / do)**0.5) + 1.25 * TF)**1.2)
@@ -193,7 +192,6 @@ def main(P, TR, dg, T, R, Mar, Api, RGL, TF, S):
     
     Bo, Bob = fator_volume_formacao_oleo(Rs, dg, do, TF, P, Pb, RGL, Co)
 
-    # CORRIGIDO → TF agora vai junto:
     rhoo, rhoob = massa_especifica_oleo_INSITU(Rs, dg, do, Bo, P, Pb, RGL, Co, TF)
 
     uos = viscosidade_oleo_saturado(P, Pb, Rs, uom)
