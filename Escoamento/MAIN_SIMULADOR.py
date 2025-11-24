@@ -21,7 +21,7 @@ do = 141.5 / (API + 131.5)
 P_res_bar = 550.0       # bar
 T_res_C = 80.0          # °C
 # --- Geometria do Duto ---
-D_pol = 3               # Diâmetro (suposição padrão, ajuste se necessário)
+D_pol = 3.0           # Diâmetro (suposição padrão, ajuste se necessário)
 D_m = D_pol * 0.0254    # m
 Rugosidade = 4.5e-5     # m (Aço carbono típico)
 # --- Propriedades Térmicas ---
