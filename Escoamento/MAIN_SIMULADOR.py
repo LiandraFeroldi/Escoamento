@@ -4,38 +4,52 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# Importação dos módulos auxiliares (certifique-se que estão na mesma pasta)
 import PVT_OFICIAL
 import BEGGS_BRILL as BB
 
-# 1. DADOS DE ENTRADA 
+# ============================================================================
+# 1. DADOS DE ENTRADA (BASEADO NO PDF - GRUPO 2)
 # ============================================================================
 print("--- INICIANDO SIMULAÇÃO GRUPO 2 ---")
+
 # --- Fluido ---
 Q_std_d = 10000.0       # sm3/d (Meta de produção)
 BSW = 0.30              # 30%
 RGL = 150.0             # sm3/sm3
 API = 25.0              # Grau API
 dg = 0.75               # Gravidade específica gás
+
+# Cálculo da densidade relativa do óleo (necessário para o Cp das meninas)
 do = 141.5 / (API + 131.5) 
+
 # --- Reservatório (Condição de Contorno Inicial - Fundo) ---
-P_res_bar = 550.0       # bar
+P_res_bar = 380.0       # bar
 T_res_C = 80.0          # °C
+
 # --- Geometria do Duto ---
-D_pol = 3               # Diâmetro (suposição padrão, ajuste se necessário)
+D_pol = 3.5             # Diâmetro (suposição padrão, ajuste se necessário)
 D_m = D_pol * 0.0254    # m
 Rugosidade = 4.5e-5     # m (Aço carbono típico)
+Area_Duto = math.pi * (D_m / 2)**2
+
 # --- Propriedades Térmicas ---
-TEC_poco = 2.0          # W/m.K (Linear)
-TEC_marinho = 1.0       # W/m.K (Linear)
+# O Cp será calculado dinamicamente no loop
+TEC_poco = 2            # W/m.K (Linear)
+TEC_marinho = 1         # W/m.K (Linear)
+
 # --- Temperaturas Ambientais (Condições de Contorno Externas) ---
 T_fundo_mar_C = 4.0     # °C
 T_superficie_C = 17.0   # °C
 
-# 2.GEOMETRIA DO SISTEMA
+# ============================================================================
+# 2. DEFINIÇÃO DA TOPOLOGIA (GEOMETRIA DO SISTEMA)
 # ============================================================================
 # Discretização (tamanho do passo de cálculo)
 dL_step = 10.0 # metros (quanto menor, mais preciso)
+
 sections = []
+
 # --- TRECHO 1: POÇO (Reservatório -> ANM) ---
 L_poco = 2100 - 950
 n_steps1 = int(L_poco / dL_step)
@@ -63,6 +77,10 @@ for i in range(n_steps3):
     T_amb = 4.0 + (17.0 - 4.0) * frac
     sections.append({"theta": 90.0, "T_amb_C": T_amb, "TEC": TEC_marinho, "dL": dL_step})
 
+# CALCULA O COMPRIMENTO TOTAL PREVISTO (Para fixar o gráfico)
+L_total_sistema = sum([s['dL'] for s in sections])
+
+# ============================================================================
 # 3. LOOP DE SIMULAÇÃO (MARCHA PxT)
 # ============================================================================
 
@@ -70,9 +88,17 @@ for i in range(n_steps3):
 P_atual_psia = P_res_bar * 14.5038
 T_atual_R = (T_res_C * 9.0/5.0) + 491.67
 L_acumulado = 0.0
+
 # Cálculo inicial do Pb para o ponto de partida
 TF_start = T_atual_R - 459.67
 Pb_inicial_psia = PVT_OFICIAL.obter_pressao_bolha(RGL, dg, API, TF_start)
+
+# Chamada inicial ao PVT para pegar densidades de partida
+pvt_init = PVT_OFICIAL.main(P_atual_psia, T_atual_R, dg, T_atual_R, 10.73, 28.96, API, RGL, TF_start, 0)
+# Indices baseados no retorno do PVT_OFICIAL: rhog (6), rhoo (15)
+rho_g_init = pvt_init[6] * 16.018463 # lb/ft3 -> kg/m3
+rho_o_init = pvt_init[15] * 16.018463
+
 # Listas para armazenar resultados (para gráficos e Excel)
 dados_simulacao = {
     "L_m": [0.0],
@@ -82,9 +108,14 @@ dados_simulacao = {
     "Regime": ["N/A"],
     "Bo": [0.0],
     "Bg": [0.0],
-    "Pb_bar": [Pb_inicial_psia / 14.5038] # Pressão de Bolha
+    "Pb_bar": [Pb_inicial_psia / 14.5038],
+    "Vsg": [0.0],
+    "dp_dL": [0.0],
+    "rho_o": [rho_o_init], # Densidade Oleo (kg/m3)
+    "rho_g": [rho_g_init]  # Densidade Gas (kg/m3)
 }
-# Vazão Mássica Aproximada
+
+# Vazão Mássica Aproximada (para equação de temperatura)
 q_m3s = Q_std_d / 86400.0
 qm_kg_s = q_m3s * 850.0 # Estimativa inicial
 
@@ -99,24 +130,45 @@ for step in sections:
     # --- A. CÁLCULO HIDRÁULICO (Pressão) ---
     pvt_inputs = (dg, T_atual_R, 10.73, 28.96, API, RGL, (T_atual_R - 459.67), 0)
     
+    # Inicializa variável de perda caso dê erro
+    dp_total_Pa_m = 0.0
+
     try:
+        # Chama Beggs & Brill
         dp_total_Pa_m, Hl, regime, Bg, Bo, rho_mix_si = BB.calc_gradient(
             Q_std_d, D_m, Rugosidade, theta, P_atual_psia, T_atual_R, pvt_inputs, BSW
         )
+        
+        # RECALCULA PVT AQUI PARA PEGAR AS DENSIDADES SEPARADAS (Já que o BB retorna misturado)
+        # Isso garante que temos rho_oleo e rho_gas exatos para o plot
+        pvt_res = PVT_OFICIAL.main(P_atual_psia, T_atual_R, *pvt_inputs)
+        rho_g_step = pvt_res[6] * 16.018463
+        rho_o_step = pvt_res[15] * 16.018463
+        
     except Exception as e:
         print(f"ERRO CRÍTICO em L={L_acumulado:.1f}m: {e}")
         break
+
+    # --- CÁLCULO MANUAL DA VSG (Para o gráfico) ---
+    TF_atual = T_atual_R - 459.67
+    Pb_local = PVT_OFICIAL.obter_pressao_bolha(RGL, dg, API, TF_atual)
+    Rs_local = PVT_OFICIAL.razao_solubilidade_gas_oleo(P_atual_psia, dg, API, TF_atual, Pb_local)
+    
+    Q_oleo_std_s = (Q_std_d / 86400.0) * (1 - BSW)
+    Gas_livre_std = max(0, (RGL - Rs_local) * Q_oleo_std_s)
+    Q_gas_insitu = Gas_livre_std * Bg 
+    Vsg_local = Q_gas_insitu / Area_Duto
 
     # Atualiza Pressão
     dp_psi_m = dp_total_Pa_m * 1.45038e-4
     P_new_psia = P_atual_psia - (dp_psi_m * dL)
     
-    # --- B. CÁLCULO TÉRMICO  ---
+    # --- B. CÁLCULO TÉRMICO (Fórmula da Imagem + Cp das Meninas) ---
     T_amb_K = T_amb_C + 273.15
     T_old_K = (T_atual_R - 491.67) * 5.0/9.0 + 273.15
     theta_rad = math.radians(theta)
 
-    # CÁLCULO DO Cp 
+    # CÁLCULO DO Cp (IGUAL AO DELAS)
     Cp_kJ = ((2e-3) * T_amb_C - 1.429) * do + (2.67e-3) * T_amb_C + 3.049
     Cp_oleo = Cp_kJ * 1000.0 # Converte kJ para J
 
@@ -133,8 +185,8 @@ for step in sections:
     T_new_R = (T_new_C * 9.0/5.0) + 491.67
     
     # --- C. CÁLCULO DA PRESSÃO DE BOLHA (NOVO) ---
-    TF_atual = T_new_R - 459.67
-    Pb_atual_psia = PVT_OFICIAL.obter_pressao_bolha(RGL, dg, API, TF_atual)
+    TF_new = T_new_R - 459.67
+    Pb_atual_psia = PVT_OFICIAL.obter_pressao_bolha(RGL, dg, API, TF_new)
     
     # --- D. ATUALIZAÇÃO E ARMAZENAMENTO ---
     L_acumulado += dL
@@ -149,7 +201,12 @@ for step in sections:
     dados_simulacao["Bo"].append(Bo)
     dados_simulacao["Bg"].append(Bg)
     dados_simulacao["Pb_bar"].append(Pb_atual_psia / 14.5038)
+    dados_simulacao["Vsg"].append(Vsg_local) 
+    dados_simulacao["dp_dL"].append(dp_total_Pa_m * 1e-5) # Armazena Perda em bar/m
+    dados_simulacao["rho_o"].append(rho_o_step)
+    dados_simulacao["rho_g"].append(rho_g_step)
 
+# ============================================================================
 # 4. RESULTADOS, RELATÓRIO E GRÁFICOS
 # ============================================================================
 df = pd.DataFrame(dados_simulacao)
@@ -183,7 +240,6 @@ if len(df) > 1:
     print(f"   - Pressão de Bolha na Chegada: {Pb_chegada:.2f} bar")
     
     if P_chegada < Pb_chegada:
-        # Descobre onde cruzou
         try:
             idx_cruzamento = df[df["P_bar"] < df["Pb_bar"]].index[0]
             L_cruzamento = df["L_m"].iloc[idx_cruzamento]
@@ -220,7 +276,8 @@ except Exception as e:
     print(f"Erro ao salvar Excel: {e}")
 
 # --- PLOTAGEM ---
-fig, axs = plt.subplots(3, 2, figsize=(14, 15))
+# 8 GRÁFICOS (4 LINHAS X 2 COLUNAS)
+fig, axs = plt.subplots(4, 2, figsize=(14, 20))
 fig.suptitle(f'Simulação de Escoamento - Grupo 2 (Q={Q_std_d} sm3/d)', fontsize=16)
 
 # 1. Pressão
@@ -232,6 +289,7 @@ axs[0, 0].set_ylabel('Pressão (bar)')
 axs[0, 0].set_title('Perfil de Pressão')
 axs[0, 0].grid(True)
 axs[0, 0].legend()
+axs[0, 0].set_xlim(0, L_total_sistema)
 
 # 2. Temperatura
 axs[0, 1].plot(df["L_m"], df["T_C"], 'r-', lw=2)
@@ -239,6 +297,7 @@ axs[0, 1].set_xlabel('Comprimento (m)')
 axs[0, 1].set_ylabel('Temperatura (°C)')
 axs[0, 1].set_title('Perfil de Temperatura')
 axs[0, 1].grid(True)
+axs[0, 1].set_xlim(0, L_total_sistema)
 
 # 3. Holdup
 axs[1, 0].plot(df["L_m"], df["Holdup"], 'g-', lw=2)
@@ -247,6 +306,7 @@ axs[1, 0].set_ylabel('Holdup Líquido (-)')
 axs[1, 0].set_title('Fração de Líquido')
 axs[1, 0].grid(True)
 axs[1, 0].set_ylim(0, 1.1)
+axs[1, 0].set_xlim(0, L_total_sistema)
 
 # 4. Fatores Volume (Bo e Bg)
 axs[1, 1].plot(df["L_m"], df["Bo"] / 0.1589873, 'b-', label='Bo')
@@ -255,6 +315,8 @@ axs[1, 1].set_ylabel('Bo', color='b')
 axs[1, 1].tick_params(axis='y', labelcolor='b')
 axs[1, 1].set_title('Fatores Volume (Bo e Bg)')
 axs[1, 1].grid(True)
+axs[1, 1].set_xlim(0, L_total_sistema)
+
 ax4_twin = axs[1, 1].twinx()
 ax4_twin.plot(df["L_m"], df["Bg"]/ 0.1589873, 'r--', label='Bg')
 ax4_twin.set_ylabel('Bg', color='r')
@@ -263,15 +325,47 @@ lines_1, labels_1 = axs[1, 1].get_legend_handles_labels()
 lines_2, labels_2 = ax4_twin.get_legend_handles_labels()
 axs[1, 1].legend(lines_1 + lines_2, labels_1 + labels_2, loc='best')
 
-# 5. NOVO GRÁFICO: Perfil de Pressão de Bolha Isolado
+# 5. Perfil de Pressão de Bolha Isolado
 axs[2, 0].plot(df["L_m"], df["Pb_bar"], 'purple', lw=2)
 axs[2, 0].set_xlabel('Comprimento (m)')
 axs[2, 0].set_ylabel('Pressão de Bolha (bar)')
-axs[2, 0].set_title('Perfil de Pressão de Bolha (Variação com Temperatura)')
+axs[2, 0].set_title('Perfil de Pressão de Bolha')
 axs[2, 0].grid(True)
+axs[2, 0].set_xlim(0, L_total_sistema)
 
-# Remove o gráfico 6 (vazio)
-fig.delaxes(axs[2, 1])
+# 6. Perfil de Velocidade Superficial Gás (Vsg)
+axs[2, 1].plot(df["L_m"], df["Vsg"], 'orange', lw=2)
+axs[2, 1].set_xlabel('Comprimento (m)')
+axs[2, 1].set_ylabel('Vsg (m/s)')
+axs[2, 1].set_title('Velocidade Superficial do Gás')
+axs[2, 1].grid(True)
+axs[2, 1].set_xlim(0, L_total_sistema)
+
+# 7. Perda de Carga por Comprimento
+axs[3, 0].plot(df["L_m"], df["dp_dL"], 'brown', lw=2)
+axs[3, 0].set_xlabel('Comprimento (m)')
+axs[3, 0].set_ylabel('Perda de Carga (bar/m)')
+axs[3, 0].set_title('Gradiente de Pressão (dP/dL)')
+axs[3, 0].grid(True)
+axs[3, 0].set_xlim(0, L_total_sistema)
+
+# 8. NOVO GRÁFICO: Densidades
+axs[3, 1].plot(df["L_m"], df["rho_o"], 'b-', label='Óleo')
+axs[3, 1].set_xlabel('Comprimento (m)')
+axs[3, 1].set_ylabel('Densidade Óleo (kg/m³)', color='b')
+axs[3, 1].tick_params(axis='y', labelcolor='b')
+axs[3, 1].set_title('Densidades dos Fluidos')
+axs[3, 1].grid(True)
+axs[3, 1].set_xlim(0, L_total_sistema)
+
+ax8_twin = axs[3, 1].twinx()
+ax8_twin.plot(df["L_m"], df["rho_g"], 'r--', label='Gás')
+ax8_twin.set_ylabel('Densidade Gás (kg/m³)', color='r')
+ax8_twin.tick_params(axis='y', labelcolor='r')
+
+lines_8a, labels_8a = axs[3, 1].get_legend_handles_labels()
+lines_8b, labels_8b = ax8_twin.get_legend_handles_labels()
+axs[3, 1].legend(lines_8a + lines_8b, labels_8a + labels_8b, loc='best')
 
 plt.tight_layout()
 plt.show()
