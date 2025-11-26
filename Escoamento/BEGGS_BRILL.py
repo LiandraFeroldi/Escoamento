@@ -268,4 +268,4 @@ def calc_gradient(Q_st_sm3d, D, eps, theta_deg, P_psia, T_R, pvt_inputs, BSW=0.3
 
     # Retorna na ordem que o MAIN espera:
     # dp_total (Pa/m), HL, regime, Bg (m3/std per std), Bo (m3/m3), rho_slip (kg/m3)
-    return dp_total, HL, regime, Bg, Bo, rho_slip
+    return dp_total, HL, regime, Bg, Bo, rho_slip,dp_fric,dp_grav
