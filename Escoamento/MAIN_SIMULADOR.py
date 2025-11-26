@@ -16,7 +16,7 @@ print("--- INICIANDO SIMULAÇÃO GRUPO 2 ---")
 # --- Fluido ---
 Q_std_d = 10000.0       # sm3/d (Meta de produção)
 BSW = 0.30              # 30%
-RGL = 150.0             # sm3/sm3
+RGL = 200.0             # sm3/sm3
 API = 25.0              # Grau API
 dg = 0.75               # Gravidade específica gás
 
