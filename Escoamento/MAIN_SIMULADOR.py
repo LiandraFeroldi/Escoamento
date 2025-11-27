@@ -16,7 +16,7 @@ print("--- INICIANDO SIMULAÇÃO GRUPO 2 ---")
 # --- Fluido ---
 Q_std_d = 10000.0       # sm3/d (Meta de produção)
 BSW = 0.30              # 30%
-RGL = 150.0             # sm3/sm3
+RGL = 300.0             # sm3/sm3
 API = 25.0              # Grau API
 dg = 0.75               # Gravidade específica gás
 
@@ -24,18 +24,18 @@ dg = 0.75               # Gravidade específica gás
 do = 141.5 / (API + 131.5) 
 
 # --- Reservatório ---
-P_res_bar = 380.0       # bar
+P_res_bar = 300.0       # bar
 T_res_C = 80.0          # °C
 
 # --- Geometria do Duto ---
-D_pol = 3.5             # Diâmetro
+D_pol = 4             # Diâmetro
 D_m = D_pol * 0.0254    # m
 Rugosidade = 4.5e-5     # m
 Area_Duto = math.pi * (D_m / 2)**2
 
 # --- Propriedades Térmicas ---
-TEC_poco = 2            # W/m.K
-TEC_marinho = 1         # W/m.K
+TEC_poco = 10            # W/m.K
+TEC_marinho =   25      # W/m.K
 
 # --- Temperaturas Ambientais ---
 T_fundo_mar_C = 4.0     # °C
@@ -81,14 +81,24 @@ Pb_inicial_psia = PVT_OFICIAL.obter_pressao_bolha(RGL, dg, API, TF_start)
 pvt_init = PVT_OFICIAL.main(P_atual_psia, T_atual_R, dg, T_atual_R, 10.73, 28.96, API, RGL, TF_start, 0)
 rho_g_init = pvt_init[6] * 16.018463
 rho_o_init = pvt_init[15] * 16.018463
+rho_mix_init = rho_o_init * (1-BSW) + 1000 * BSW
 
-# Dicionário COMPLETO (com dp_fric e dp_grav inicializados)
+# Viscosidades iniciais (Estimativa para plot)
+mu_o_init = (pvt_init[18] if pvt_init[18] else pvt_init[17]) * 0.001 # cP -> Pa.s
+mu_g_init = pvt_init[8] * 0.001
+mu_mix_init = mu_o_init
+
+# Dicionário COMPLETO
 dados_simulacao = {
     "L_m": [0.0], "P_bar": [P_res_bar], "T_C": [T_res_C], "Holdup": [0.0],
     "Regime": ["N/A"], "Bo": [0.0], "Bg": [0.0], "Pb_bar": [Pb_inicial_psia / 14.5038],
-    "Vsg": [0.0], "dp_dL": [0.0], 
+    "Vsg": [0.0], "Vsl": [0.0], "Vm": [0.0], 
+    "dp_dL": [0.0], 
     "rho_o": [rho_o_init], "rho_g": [rho_g_init],
-    "dp_fric": [0.0], "dp_grav": [0.0]  # <--- ADICIONADO
+    "rho_mix": [rho_mix_init], 
+    "rho_ns": [rho_mix_init], 
+    "dp_fric": [0.0], "dp_grav": [0.0],
+    "mu_o": [mu_o_init], "mu_g": [mu_g_init], "mu_mix": [mu_mix_init] # NOVAS COLUNAS
 }
 
 q_m3s = Q_std_d / 86400.0
@@ -102,7 +112,7 @@ for step in sections:
     T_amb_C = step['T_amb_C']
     TEC_linear = step['TEC']
     
-    if P_atual_psia < 15: break # Trava de segurança
+    if P_atual_psia < 15: break 
 
     pvt_inputs = (dg, T_atual_R, 10.73, 28.96, API, RGL, (T_atual_R - 459.67), 0)
     
@@ -110,18 +120,45 @@ for step in sections:
     dp_total_Pa_m = 0.0
     dp_fric_Pa_m = 0.0
     dp_grav_Pa_m = 0.0
-    rho_g_step = 0
-    rho_o_step = 0
+    rho_mix_si = 0.0
+    rho_ns_step = 0.0
+    rho_g_step = 0.0
+    rho_o_step = 0.0
+    mu_o_val = 0.0; mu_g_val = 0.0; mu_mix_val = 0.0
 
     try:
-        # CAPTURA OS 8 VALORES DO BEGGS (incluindo fricção e gravidade)
-        dp_total_Pa_m, Hl, regime, Bg, Bo, rho_mix_si, dp_fric_Pa_m, dp_grav_Pa_m = BB.calc_gradient(
+        # CAPTURA OS 9 VALORES DO BEGGS
+        dp_total_Pa_m, Hl, regime, Bg, Bo, rho_mix_si, dp_fric_Pa_m, dp_grav_Pa_m, rho_ns_step = BB.calc_gradient(
             Q_std_d, D_m, Rugosidade, theta, P_atual_psia, T_atual_R, pvt_inputs, BSW
         )
         
         pvt_res = PVT_OFICIAL.main(P_atual_psia, T_atual_R, *pvt_inputs)
         rho_g_step = pvt_res[6] * 16.018463
         rho_o_step = pvt_res[15] * 16.018463
+        
+        # --- CÁLCULO MANUAL DAS VISCOSIDADES PARA O GRÁFICO ---
+        # (Já que não estamos pegando do BB, pegamos do PVT aqui)
+        mu_o_cP = pvt_res[18] if pvt_res[18] else pvt_res[17] # uos ou uom
+        mu_g_cP = pvt_res[8] # ug
+        mu_w_cP = pvt_res[23] # uw
+        
+        mu_o_val = mu_o_cP * 0.001 # Pa.s
+        mu_g_val = mu_g_cP * 0.001 # Pa.s
+        mu_w_val = mu_w_cP * 0.001 # Pa.s
+        
+        # Viscosidade da Mistura No-Slip (Aprox)
+        # mu_ns = mu_o * lam + mu_g * (1-lam)
+        # Precisamos calcular lambda
+        Pb_loc = PVT_OFICIAL.obter_pressao_bolha(RGL, dg, API, T_atual_R - 459.67)
+        Rs_loc = PVT_OFICIAL.razao_solubilidade_gas_oleo(P_atual_psia, dg, API, T_atual_R - 459.67, Pb_loc)
+        q_oil = (Q_std_d/86400)*(1-BSW)
+        q_gas = max(0, (RGL - Rs_loc)*q_oil) * Bg
+        vsg_tmp = q_gas / Area_Duto
+        vsl_tmp = ((q_oil * Bo) + (Q_std_d/86400)*BSW) / Area_Duto
+        lam_tmp = vsl_tmp / (vsl_tmp + vsg_tmp + 1e-9)
+        
+        mu_liq_mix = mu_o_val*(1-BSW) + mu_w_val*BSW
+        mu_mix_val = mu_liq_mix * lam_tmp + mu_g_val * (1 - lam_tmp)
         
     except Exception as e:
         print(f"ERRO CRÍTICO em L={L_acumulado:.1f}m: {e}")
@@ -136,6 +173,13 @@ for step in sections:
     Gas_livre_std = max(0, (RGL - Rs_local) * Q_oleo_std_s)
     Q_gas_insitu = Gas_livre_std * Bg 
     Vsg_local = Q_gas_insitu / Area_Duto
+
+    # Líquido (Vsl)
+    Q_liq_insitu = (Q_oleo_std_s * Bo) + (Q_std_d / 86400.0) * BSW 
+    Vsl_local = Q_liq_insitu / Area_Duto
+
+    # Mistura (Vm)
+    Vm_local = Vsl_local + Vsg_local
 
     # Atualiza Pressão
     dp_psi_m = dp_total_Pa_m * 1.45038e-4
@@ -153,11 +197,11 @@ for step in sections:
     T_new_C = T_new_K - 273.15
     T_new_R = (T_new_C * 9.0/5.0) + 491.67
     
-    # C. Pressão de Bolha
+    # Pb
     TF_new = T_new_R - 459.67
     Pb_atual_psia = PVT_OFICIAL.obter_pressao_bolha(RGL, dg, API, TF_new)
     
-    # D. ATUALIZAÇÃO E ARMAZENAMENTO
+    # Armazenamento
     L_acumulado += dL
     P_atual_psia = P_new_psia
     T_atual_R = T_new_R
@@ -171,77 +215,160 @@ for step in sections:
     dados_simulacao["Bg"].append(Bg)
     dados_simulacao["Pb_bar"].append(Pb_atual_psia / 14.5038)
     dados_simulacao["Vsg"].append(Vsg_local) 
+    dados_simulacao["Vsl"].append(Vsl_local)
+    dados_simulacao["Vm"].append(Vm_local) 
     dados_simulacao["dp_dL"].append(dp_total_Pa_m * 1e-5) 
     dados_simulacao["rho_o"].append(rho_o_step)
     dados_simulacao["rho_g"].append(rho_g_step)
-    # SALVANDO COMPONENTES (CONVERTENDO PARA bar/m)
+    dados_simulacao["rho_mix"].append(rho_mix_si)
+    dados_simulacao["rho_ns"].append(rho_ns_step)
     dados_simulacao["dp_fric"].append(dp_fric_Pa_m * 1e-5) 
     dados_simulacao["dp_grav"].append(dp_grav_Pa_m * 1e-5)
+    dados_simulacao["mu_o"].append(mu_o_val) 
+    dados_simulacao["mu_g"].append(mu_g_val) 
+    dados_simulacao["mu_mix"].append(mu_mix_val)
+# ============================================================================
+# 4. RESULTADOS E PLOTAGEM - GRÁFICOS SEPARADOS
+# ============================================================================
 
-# ============================================================================
-# 4. RESULTADOS E PLOTAGEM
-# ============================================================================
 df = pd.DataFrame(dados_simulacao)
 
-# --- PLOTAGEM (5 LINHAS PARA CABER O 9º GRÁFICO) ---
-fig, axs = plt.subplots(5, 2, figsize=(14, 25)) # Aumentei altura para 25
-fig.suptitle(f'Simulação de Escoamento - Grupo 2 (Q={Q_std_d} sm3/d)', fontsize=16)
+print("\n" + "="*60)
+print(f" RELATÓRIO DE INTERPRETAÇÃO (L = {L_acumulado:.1f} m)")
+if len(df) > 1:
+    P_chegada = df["P_bar"].iloc[-1]
+    if P_chegada >= 15.0:
+        print(f"   >>> STATUS: SUCESSO! O poço produz.")
+    else:
+        print(f"   >>> STATUS: FALHA. Pressão insuficiente.")
+print("="*60 + "\n")
 
-# 1. Pressão
-axs[0, 0].plot(df["L_m"], df["P_bar"], 'b-', lw=2); axs[0, 0].set_title('Pressão'); axs[0, 0].grid(True)
-axs[0, 0].set_xlim(0, L_total_sistema)
+try:
+    df.to_excel("Relatorio_Grupo2.xlsx", index=False)
+    print("Arquivo 'Relatorio_Grupo2.xlsx' gerado com sucesso.")
+except Exception as e:
+    print(f"Erro ao salvar Excel: {e}")
 
-# 2. Temperatura
-axs[0, 1].plot(df["L_m"], df["T_C"], 'r-', lw=2); axs[0, 1].set_title('Temperatura'); axs[0, 1].grid(True)
-axs[0, 1].set_xlim(0, L_total_sistema)
+# ============================================================================
+# GRÁFICO 1: PRESSÃO
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["P_bar"], 'b-', lw=2, label='Pressão')
+plt.plot(df["L_m"], df["Pb_bar"], 'k--', lw=1.5, label='Pressão de Bolha')
+plt.axhline(15, color='r', linestyle='--', label='Pressão Separador')
+plt.title('Pressão ao Longo da Linha (bar)')
+plt.xlabel('Comprimento (m)'); plt.ylabel('Pressão (bar)')
+plt.grid(True); plt.legend()
+plt.show()
 
-# 3. Holdup
-axs[1, 0].plot(df["L_m"], df["Holdup"], 'g-', lw=2); axs[1, 0].set_title('Holdup'); axs[1, 0].grid(True)
-axs[1, 0].set_xlim(0, L_total_sistema)
+# ============================================================================
+# GRÁFICO 2: TEMPERATURA
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["T_C"], 'r-', lw=2)
+plt.title('Temperatura (°C)')
+plt.xlabel('Comprimento (m)')
+plt.ylabel('T (°C)')
+plt.grid(True)
+plt.show()
 
-# 4. Fatores Volume
-axs[1, 1].plot(df["L_m"], df["Bo"], 'b-', label='Bo'); axs[1, 1].set_title('Bo e Bg'); axs[1, 1].grid(True)
-ax4_twin = axs[1, 1].twinx(); ax4_twin.plot(df["L_m"], df["Bg"], 'r--', label='Bg')
-axs[1, 1].set_xlim(0, L_total_sistema)
+# ============================================================================
+# GRÁFICO 3: HOLDUP
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["Holdup"], 'g-', lw=2)
+plt.title('Holdup Líquido')
+plt.xlabel('Comprimento (m)'); plt.ylabel('Holdup (-)')
+plt.grid(True)
+plt.show()
 
-# 5. Pb
-axs[2, 0].plot(df["L_m"], df["Pb_bar"], 'purple', lw=2); axs[2, 0].set_title('Pb'); axs[2, 0].grid(True)
-axs[2, 0].set_xlim(0, L_total_sistema)
+# ============================================================================
+# GRÁFICO 4: FATORES DE VOLUME (Bo e Bg)
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["Bo"], 'b-', label='Bo')
+plt.plot(df["L_m"], df["Bg"], 'r--', label='Bg')
+plt.title('Fatores de Volume')
+plt.xlabel('Comprimento (m)')
+plt.grid(True)
+plt.legend()
+plt.show()
 
-# 6. Vsg
-axs[2, 1].plot(df["L_m"], df["Vsg"], 'orange', lw=2); axs[2, 1].set_title('Vsg'); axs[2, 1].grid(True)
-axs[2, 1].set_xlim(0, L_total_sistema)
+# ============================================================================
+# GRÁFICO 5: PRESSÃO DE BOLHA
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["Pb_bar"], 'purple', lw=2)
+plt.title('Pressão de Bolha (bar)')
+plt.xlabel('Comprimento (m)'); plt.ylabel('Pb (bar)')
+plt.grid(True)
+plt.show()
 
-# 7. Gradiente Total
-axs[3, 0].plot(df["L_m"], df["dp_dL"], 'brown', lw=2); axs[3, 0].set_title('Gradiente Total (dP/dL)'); axs[3, 0].grid(True)
-axs[3, 0].set_xlim(0, L_total_sistema)
+# ============================================================================
+# GRÁFICO 6: VELOCIDADES SUPERFICIAIS
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["Vsg"], 'orange', lw=2, label='Vsg')
+plt.plot(df["L_m"], df["Vsl"], 'c-', lw=2, label='Vsl')
+plt.plot(df["L_m"], df["Vm"], 'k--', lw=2, label='Vm')
+plt.title('Velocidades Superficiais (m/s)')
+plt.xlabel('Comprimento (m)'); plt.ylabel('Velocidade (m/s)')
+plt.grid(True); plt.legend()
+plt.show()
 
-# 8. Densidades
-axs[3, 1].plot(df["L_m"], df["rho_o"], 'b-', label='Oleo'); axs[3, 1].set_title('Densidades'); axs[3, 1].grid(True)
-ax8_twin = axs[3, 1].twinx(); ax8_twin.plot(df["L_m"], df["rho_g"], 'r--', label='Gas')
-axs[3, 1].set_xlim(0, L_total_sistema)
+# ============================================================================
+# GRÁFICO 7: GRADIENTE TOTAL
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["dp_dL"], 'brown', lw=2)
+plt.title('Gradiente Total (bar/m)')
+plt.xlabel('Comprimento (m)'); plt.ylabel('dp/dL (bar/m)')
+plt.grid(True)
+plt.show()
 
-# 9. NOVO GRÁFICO: Componentes de Perda
-# Plotamos Fricção no eixo esquerdo e Gravidade no direito (pois gravidade pode ser bem maior no inicio)
-axs[4, 0].plot(df["L_m"], df["dp_fric"], 'r-', label='Fricção')
-axs[4, 0].set_xlabel('Comprimento (m)')
-axs[4, 0].set_ylabel('Fricção (bar/m)', color='r')
-axs[4, 0].tick_params(axis='y', labelcolor='r')
-axs[4, 0].set_title('Componentes de Perda (Fricção vs Gravidade)')
-axs[4, 0].grid(True)
-axs[4, 0].set_xlim(0, L_total_sistema)
+# ============================================================================
+# GRÁFICO 8: DENSIDADES
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["rho_o"], 'b-', label='Óleo')
+plt.plot(df["L_m"], df["rho_mix"], 'k-', linewidth=2, label='Mistura')
+plt.plot(df["L_m"], df["rho_g"], 'r--', label='Gás')
+plt.title('Densidades (kg/m³)')
+plt.xlabel('Comprimento (m)')
+plt.ylabel('Densidade (kg/m³)')
+plt.grid(True); plt.legend()
+plt.show()
 
-ax9_twin = axs[4, 0].twinx()
-ax9_twin.plot(df["L_m"], df["dp_grav"], 'g--', label='Gravitacional')
-ax9_twin.set_ylabel('Gravidade (bar/m)', color='g')
-ax9_twin.tick_params(axis='y', labelcolor='g')
+# ============================================================================
+# GRÁFICO 9: PERDAS (FRICÇÃO E GRAVIDADE)
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["dp_fric"], 'r-', label='Perda por Fricção')
+plt.plot(df["L_m"], df["dp_grav"], 'g--', label='Perda por Gravidade')
+plt.title('Perdas por Fricção e Gravidade (bar/m)')
+plt.xlabel('Comprimento (m)')
+plt.ylabel('Perda (bar/m)')
+plt.grid(True); plt.legend()
+plt.show()
 
-lines_9a, labels_9a = axs[4, 0].get_legend_handles_labels()
-lines_9b, labels_9b = ax9_twin.get_legend_handles_labels()
-axs[4, 0].legend(lines_9a + lines_9b, labels_9a + labels_9b, loc='best')
+# ============================================================================
+# GRÁFICO 10: VISCOSIDADES
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["mu_o"], 'b-', label='Óleo')
+plt.plot(df["L_m"], df["mu_mix"], 'k-', linewidth=2, label='Mistura')
 
-# Remove o gráfico vazio (10)
-fig.delaxes(axs[4, 1])
+plt.title('Viscosidades (Pa.s)')
+plt.xlabel('Comprimento (m)')
+plt.ylabel('Viscosidade (Pa.s)')
+plt.grid(True)
+plt.legend()
 
-plt.tight_layout()
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["mu_g"], 'r--', label='Gás')
+plt.title('Viscosidade do Gás (Pa.s)')
+plt.xlabel('Comprimento (m)')
+plt.ylabel('Viscosidade (Pa.s)')
+plt.grid(True)
+plt.legend()
 plt.show()
