@@ -69,7 +69,6 @@ L_total_sistema = sum([s['dL'] for s in sections])
 # ============================================================================
 # 3. LOOP DE SIMULAÇÃO
 # ============================================================================
-
 P_atual_psia = P_res_bar * 14.5038
 T_atual_R = (T_res_C * 9.0/5.0) + 491.67
 L_acumulado = 0.0
@@ -81,24 +80,31 @@ Pb_inicial_psia = PVT_OFICIAL.obter_pressao_bolha(RGL, dg, API, TF_start)
 pvt_init = PVT_OFICIAL.main(P_atual_psia, T_atual_R, dg, T_atual_R, 10.73, 28.96, API, RGL, TF_start, 0)
 rho_g_init = pvt_init[6] * 16.018463
 rho_o_init = pvt_init[15] * 16.018463
-rho_mix_init = rho_o_init * (1-BSW) + 1000 * BSW
+rho_w_init = pvt_init[20] * 16.018463  # <--- NOVA CAPTURA (rhow_lb no índice 20)
+
+# densidade do líquido inicial (óleo + água)
+rho_liq_init = rho_o_init * (1 - BSW) + rho_w_init * BSW
+rho_mix_init = rho_liq_init # Aproximação inicial
 
 # Viscosidades iniciais (Estimativa para plot)
 mu_o_init = (pvt_init[18] if pvt_init[18] else pvt_init[17]) * 0.001 # cP -> Pa.s
 mu_g_init = pvt_init[8] * 0.001
 mu_mix_init = mu_o_init
 
-# Dicionário COMPLETO
+# Dicionário COMPLETO (adicionada rho_w)
 dados_simulacao = {
     "L_m": [0.0], "P_bar": [P_res_bar], "T_C": [T_res_C], "Holdup": [0.0],
     "Regime": ["N/A"], "Bo": [0.0], "Bg": [0.0], "Pb_bar": [Pb_inicial_psia / 14.5038],
     "Vsg": [0.0], "Vsl": [0.0], "Vm": [0.0], 
     "dp_dL": [0.0], 
-    "rho_o": [rho_o_init], "rho_g": [rho_g_init],
+    "rho_o": [rho_o_init], 
+    "rho_w": [rho_w_init],     # <--- NOVA COLUNA
+    "rho_liq": [rho_liq_init], 
+    "rho_g": [rho_g_init],
     "rho_mix": [rho_mix_init], 
     "rho_ns": [rho_mix_init], 
     "dp_fric": [0.0], "dp_grav": [0.0],
-    "mu_o": [mu_o_init], "mu_g": [mu_g_init], "mu_mix": [mu_mix_init] # NOVAS COLUNAS
+    "mu_o": [mu_o_init], "mu_g": [mu_g_init], "mu_mix": [mu_mix_init]
 }
 
 q_m3s = Q_std_d / 86400.0
@@ -124,6 +130,7 @@ for step in sections:
     rho_ns_step = 0.0
     rho_g_step = 0.0
     rho_o_step = 0.0
+    rho_w_step = 0.0
     mu_o_val = 0.0; mu_g_val = 0.0; mu_mix_val = 0.0
 
     try:
@@ -135,6 +142,7 @@ for step in sections:
         pvt_res = PVT_OFICIAL.main(P_atual_psia, T_atual_R, *pvt_inputs)
         rho_g_step = pvt_res[6] * 16.018463
         rho_o_step = pvt_res[15] * 16.018463
+        rho_w_step = pvt_res[20] * 16.018463 # <--- Captura densidade da água
         
         # --- CÁLCULO MANUAL DAS VISCOSIDADES PARA O GRÁFICO ---
         # (Já que não estamos pegando do BB, pegamos do PVT aqui)
@@ -205,6 +213,9 @@ for step in sections:
     L_acumulado += dL
     P_atual_psia = P_new_psia
     T_atual_R = T_new_R
+
+    # calcula densidade do líquido (óleo+água) para o plot
+    rho_liq_step = rho_o_step * (1 - BSW) + rho_w_step * BSW
     
     dados_simulacao["L_m"].append(L_acumulado)
     dados_simulacao["P_bar"].append(P_atual_psia / 14.5038)
@@ -219,6 +230,8 @@ for step in sections:
     dados_simulacao["Vm"].append(Vm_local) 
     dados_simulacao["dp_dL"].append(dp_total_Pa_m * 1e-5) 
     dados_simulacao["rho_o"].append(rho_o_step)
+    dados_simulacao["rho_w"].append(rho_w_step) # <--- Armazena Água
+    dados_simulacao["rho_liq"].append(rho_liq_step)
     dados_simulacao["rho_g"].append(rho_g_step)
     dados_simulacao["rho_mix"].append(rho_mix_si)
     dados_simulacao["rho_ns"].append(rho_ns_step)
@@ -231,7 +244,6 @@ for step in sections:
 # ============================================================================
 # 4. RESULTADOS E PLOTAGEM - GRÁFICOS SEPARADOS
 # ============================================================================
-
 df = pd.DataFrame(dados_simulacao)
 
 print("\n" + "="*60)
@@ -253,20 +265,19 @@ except Exception as e:
 # ============================================================================
 # 4b. CÁLCULO DO TERMO DE ACELERAÇÃO
 # ============================================================================
-
 df["dp_total"] = df["dp_dL"]          # já está em bar/m
 df["dp_fric"] = df["dp_fric"]         # já está em bar/m
 df["dp_grav"] = df["dp_grav"]         # já está em bar/m
 
 # termo da aceleração
 df["dp_acc"] = df["dp_total"] - df["dp_fric"] - df["dp_grav"]
+
 # Função para aplicar o estilo padronizado
 def estilo_padrao():
     plt.grid(True, linestyle='--', linewidth=0.6, alpha=0.5)
     plt.axvline(1150, color='gray', linestyle='--', lw=1.2)
     plt.axvline(1316.16, color='gray', linestyle='--', lw=1.2)
     plt.tight_layout()
-
 
 # ============================================================================
 # GRÁFICO EXTRA: PERDA DE CARGA POR ACELERAÇÃO
@@ -277,7 +288,6 @@ plt.title('Perda de Carga por Aceleração (bar/m)', fontsize=14)
 plt.xlabel('Comprimento (m)'); plt.ylabel('dp/dL_aceleração (bar/m)')
 estilo_padrao()
 plt.show()
-
 
 # ============================================================================
 # GRÁFICO: TERMOS DE PERDA DE CARGA
@@ -294,9 +304,8 @@ estilo_padrao()
 plt.minorticks_on()
 plt.show()
 
-
 # ============================================================================
-# GRÁFICO 1: PRESSÃO (já OK, só alinhado)
+# GRÁFICO 1: PRESSÃO
 # ============================================================================
 plt.figure(figsize=(11,6))
 plt.plot(df["L_m"], df["P_bar"], color='#1f77b4', lw=2.5, label='Pressão')
@@ -310,7 +319,6 @@ plt.locator_params(axis='both', nbins=18)
 estilo_padrao()
 plt.show()
 
-
 # ============================================================================
 # GRÁFICO 2: TEMPERATURA
 # ============================================================================
@@ -322,7 +330,6 @@ plt.xlabel('Comprimento (m)'); plt.ylabel('T (°C)')
 estilo_padrao()
 plt.show()
 
-
 # ============================================================================
 # GRÁFICO 3: HOLDUP
 # ============================================================================
@@ -333,7 +340,6 @@ plt.title('Holdup Líquido', fontsize=14)
 plt.xlabel('Comprimento (m)'); plt.ylabel('Holdup (-)')
 estilo_padrao()
 plt.show()
-
 
 # ============================================================================
 # GRÁFICO 4: FATORES DE VOLUME
@@ -348,7 +354,6 @@ plt.legend()
 estilo_padrao()
 plt.show()
 
-
 # ============================================================================
 # GRÁFICO 5: PRESSÃO DE BOLHA
 # ============================================================================
@@ -359,7 +364,6 @@ plt.title('Pressão de Bolha (bar)', fontsize=14)
 plt.xlabel('Comprimento (m)'); plt.ylabel('Pb (bar)')
 estilo_padrao()
 plt.show()
-
 
 # ============================================================================
 # GRÁFICO 6: VELOCIDADES SUPERFICIAIS
@@ -375,7 +379,6 @@ plt.legend()
 estilo_padrao()
 plt.show()
 
-
 # ============================================================================
 # GRÁFICO 7: GRADIENTE TOTAL
 # ============================================================================
@@ -387,23 +390,39 @@ plt.xlabel('Comprimento (m)'); plt.ylabel('dp/dL (bar/m)')
 estilo_padrao()
 plt.show()
 
-
 # ============================================================================
-# GRÁFICO 8: DENSIDADES
+# GRÁFICO 8: DENSIDADES (AGORA COM ÁGUA, ÓLEO E GÁS)
 # ============================================================================
-plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["rho_o"], color='#1f77b4', lw=2, label='Óleo')
-plt.plot(df["L_m"], df["rho_mix"], color='#2ca02c', lw=2, label='Mistura')
-plt.plot(df["L_m"], df["rho_g"], color='#ff7f0e', linestyle='--', lw=2, label='Gás')
+plt.figure(figsize=(10,6))
 
-plt.title('Massas Específicas (kg/m³)', fontsize=14)
-plt.xlabel('Comprimento (m)'); plt.ylabel('Massa Específica (kg/m³)')
-plt.legend()
+# Cores e estilos
+plt.plot(df["L_m"], df["rho_o"], color="#100A05", lw=2, label='Óleo')          # marrom escuro
+plt.plot(df["L_m"], df["rho_w"], color='#1E90FF', lw=2, label='Água')           # azul vibrante
+plt.plot(df["L_m"], df["rho_g"], color="#FF0000", lw=2, linestyle='--', label='Gás') # laranja tracejado
+
+# Linhas de referência mais finas e discretas
+plt.plot(df["L_m"], df["rho_liq"], color="#ed3670", linestyle='-', lw=2.5, alpha=0.6, label='Líquido (mix)')
+plt.plot(df["L_m"], df["rho_mix"], color="#25e925", linestyle='-.', lw=2.5, alpha=0.6, label='Mistura (fluido)')
+
+# Títulos e rótulos
+plt.title('Componentes da Massa Específica (kg/m³)', fontsize=16, weight='bold')
+plt.xlabel('Comprimento (m)', fontsize=12)
+plt.ylabel('Massa Específica (kg/m³)', fontsize=12)
+
+# Grid discreto
+plt.grid(alpha=0.3)
+
+# Legenda
+plt.legend(frameon=True, facecolor='white', fontsize=11)
+
+# Número de ticks
 plt.locator_params(axis='both', nbins=15)
-estilo_padrao()
+
+# Estilo adicional (se você tiver função personalizada)
+# estilo_padrao() 
+
+plt.tight_layout()
 plt.show()
-
-
 # ============================================================================
 # GRÁFICO 9: PERDAS FRICÇÃO E GRAVIDADE
 # ============================================================================
@@ -416,7 +435,6 @@ plt.xlabel('Comprimento (m)'); plt.ylabel('Perda (bar/m)')
 plt.legend()
 estilo_padrao()
 plt.show()
-
 
 # ============================================================================
 # GRÁFICO 10: VISCOSIDADES
@@ -440,4 +458,3 @@ plt.xlabel('Comprimento (m)'); plt.ylabel('Viscosidade (Pa.s)')
 plt.legend()
 estilo_padrao()
 plt.show()
-
