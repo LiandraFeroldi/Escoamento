@@ -227,6 +227,7 @@ for step in sections:
     dados_simulacao["mu_o"].append(mu_o_val) 
     dados_simulacao["mu_g"].append(mu_g_val) 
     dados_simulacao["mu_mix"].append(mu_mix_val)
+
 # ============================================================================
 # 4. RESULTADOS E PLOTAGEM - GRÁFICOS SEPARADOS
 # ============================================================================
@@ -250,125 +251,193 @@ except Exception as e:
     print(f"Erro ao salvar Excel: {e}")
 
 # ============================================================================
-# GRÁFICO 1: PRESSÃO
+# 4b. CÁLCULO DO TERMO DE ACELERAÇÃO
+# ============================================================================
+
+df["dp_total"] = df["dp_dL"]          # já está em bar/m
+df["dp_fric"] = df["dp_fric"]         # já está em bar/m
+df["dp_grav"] = df["dp_grav"]         # já está em bar/m
+
+# termo da aceleração
+df["dp_acc"] = df["dp_total"] - df["dp_fric"] - df["dp_grav"]
+# Função para aplicar o estilo padronizado
+def estilo_padrao():
+    plt.grid(True, linestyle='--', linewidth=0.6, alpha=0.5)
+    plt.axvline(1150, color='gray', linestyle='--', lw=1.2)
+    plt.axvline(1316.16, color='gray', linestyle='--', lw=1.2)
+    plt.tight_layout()
+
+
+# ============================================================================
+# GRÁFICO EXTRA: PERDA DE CARGA POR ACELERAÇÃO
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["P_bar"], 'b-', lw=2, label='Pressão')
-plt.plot(df["L_m"], df["Pb_bar"], 'k--', lw=1.5, label='Pressão de Bolha')
-plt.axhline(15, color='r', linestyle='--', label='Pressão Separador')
-plt.title('Pressão ao Longo da Linha (bar)')
-plt.xlabel('Comprimento (m)'); plt.ylabel('Pressão (bar)')
-plt.grid(True); plt.legend()
+plt.plot(df["L_m"], df["dp_acc"], color='purple', lw=2.5)
+plt.title('Perda de Carga por Aceleração (bar/m)', fontsize=14)
+plt.xlabel('Comprimento (m)'); plt.ylabel('dp/dL_aceleração (bar/m)')
+estilo_padrao()
 plt.show()
+
+
+# ============================================================================
+# GRÁFICO: TERMOS DE PERDA DE CARGA
+# ============================================================================
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["dp_fric"], color='#1f77b4', linewidth=2, label='Fricção')
+plt.plot(df["L_m"], df["dp_grav"], color='#2ca02c', linewidth=2, label='Gravidade')
+plt.plot(df["L_m"], df["dp_acc"], color='#d62728', linestyle='--', linewidth=2.2, label='Aceleração')
+
+plt.title('Termos de Perda de Carga (bar/m)', fontsize=14)
+plt.xlabel('Comprimento (m)'); plt.ylabel('dp/dL (bar/m)')
+plt.legend()
+estilo_padrao()
+plt.minorticks_on()
+plt.show()
+
+
+# ============================================================================
+# GRÁFICO 1: PRESSÃO (já OK, só alinhado)
+# ============================================================================
+plt.figure(figsize=(11,6))
+plt.plot(df["L_m"], df["P_bar"], color='#1f77b4', lw=2.5, label='Pressão')
+plt.plot(df["L_m"], df["Pb_bar"], color='#2ca02c', lw=2, label='Pressão de Bolha')
+plt.axhline(15, color="#000000", linestyle='--', lw=2, label='Pressão Separador')
+
+plt.title('Pressão (bar)', fontsize=14)
+plt.xlabel('Comprimento (m)'); plt.ylabel('Pressão (bar)')
+plt.legend(fontsize=11)
+plt.locator_params(axis='both', nbins=18)
+estilo_padrao()
+plt.show()
+
 
 # ============================================================================
 # GRÁFICO 2: TEMPERATURA
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["T_C"], 'r-', lw=2)
-plt.title('Temperatura (°C)')
-plt.xlabel('Comprimento (m)')
-plt.ylabel('T (°C)')
-plt.grid(True)
+plt.plot(df["L_m"], df["T_C"], color="#c71b08ff", lw=2)
+
+plt.title('Temperatura (°C)', fontsize=14)
+plt.xlabel('Comprimento (m)'); plt.ylabel('T (°C)')
+estilo_padrao()
 plt.show()
+
 
 # ============================================================================
 # GRÁFICO 3: HOLDUP
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["Holdup"], 'g-', lw=2)
-plt.title('Holdup Líquido')
+plt.plot(df["L_m"], df["Holdup"], color="#00a354ff", lw=2)
+
+plt.title('Holdup Líquido', fontsize=14)
 plt.xlabel('Comprimento (m)'); plt.ylabel('Holdup (-)')
-plt.grid(True)
+estilo_padrao()
 plt.show()
 
+
 # ============================================================================
-# GRÁFICO 4: FATORES DE VOLUME (Bo e Bg)
+# GRÁFICO 4: FATORES DE VOLUME
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["Bo"], 'b-', label='Bo')
-plt.plot(df["L_m"], df["Bg"], 'r--', label='Bg')
-plt.title('Fatores de Volume')
+plt.plot(df["L_m"], df["Bo"], color="#085630ff", lw=2, label='Bo')
+plt.plot(df["L_m"], df["Bg"], color="#0013a3ff", lw=2, label='Bg')
+
+plt.title('Fatores de Volume', fontsize=14)
 plt.xlabel('Comprimento (m)')
-plt.grid(True)
 plt.legend()
+estilo_padrao()
 plt.show()
+
 
 # ============================================================================
 # GRÁFICO 5: PRESSÃO DE BOLHA
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["Pb_bar"], 'purple', lw=2)
-plt.title('Pressão de Bolha (bar)')
+plt.plot(df["L_m"], df["Pb_bar"], color="#a0288aff", lw=2)
+
+plt.title('Pressão de Bolha (bar)', fontsize=14)
 plt.xlabel('Comprimento (m)'); plt.ylabel('Pb (bar)')
-plt.grid(True)
+estilo_padrao()
 plt.show()
+
 
 # ============================================================================
 # GRÁFICO 6: VELOCIDADES SUPERFICIAIS
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["Vsg"], 'orange', lw=2, label='Vsg')
+plt.plot(df["L_m"], df["Vsg"], color="#a0288aff", lw=2, label='Vsg')
 plt.plot(df["L_m"], df["Vsl"], 'c-', lw=2, label='Vsl')
-plt.plot(df["L_m"], df["Vm"], 'k--', lw=2, label='Vm')
-plt.title('Velocidades Superficiais (m/s)')
+plt.plot(df["L_m"], df["Vm"], 'b--', lw=2, label='Vm')
+
+plt.title('Velocidades Superficiais (m/s)', fontsize=14)
 plt.xlabel('Comprimento (m)'); plt.ylabel('Velocidade (m/s)')
-plt.grid(True); plt.legend()
+plt.legend()
+estilo_padrao()
 plt.show()
+
 
 # ============================================================================
 # GRÁFICO 7: GRADIENTE TOTAL
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["dp_dL"], 'brown', lw=2)
-plt.title('Gradiente Total (bar/m)')
+plt.plot(df["L_m"], df["dp_dL"], 'brown', lw=2.5)
+
+plt.title('Gradiente Total da Perda de Carga (bar/m)', fontsize=14)
 plt.xlabel('Comprimento (m)'); plt.ylabel('dp/dL (bar/m)')
-plt.grid(True)
+estilo_padrao()
 plt.show()
+
 
 # ============================================================================
 # GRÁFICO 8: DENSIDADES
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["rho_o"], 'b-', label='Óleo')
-plt.plot(df["L_m"], df["rho_mix"], 'k-', linewidth=2, label='Mistura')
-plt.plot(df["L_m"], df["rho_g"], 'r--', label='Gás')
-plt.title('Densidades (kg/m³)')
-plt.xlabel('Comprimento (m)')
-plt.ylabel('Densidade (kg/m³)')
-plt.grid(True); plt.legend()
+plt.plot(df["L_m"], df["rho_o"], color='#1f77b4', lw=2, label='Óleo')
+plt.plot(df["L_m"], df["rho_mix"], color='#2ca02c', lw=2, label='Mistura')
+plt.plot(df["L_m"], df["rho_g"], color='#ff7f0e', linestyle='--', lw=2, label='Gás')
+
+plt.title('Massas Específicas (kg/m³)', fontsize=14)
+plt.xlabel('Comprimento (m)'); plt.ylabel('Massa Específica (kg/m³)')
+plt.legend()
+plt.locator_params(axis='both', nbins=15)
+estilo_padrao()
 plt.show()
 
+
 # ============================================================================
-# GRÁFICO 9: PERDAS (FRICÇÃO E GRAVIDADE)
+# GRÁFICO 9: PERDAS FRICÇÃO E GRAVIDADE
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["dp_fric"], 'r-', label='Perda por Fricção')
-plt.plot(df["L_m"], df["dp_grav"], 'g--', label='Perda por Gravidade')
-plt.title('Perdas por Fricção e Gravidade (bar/m)')
-plt.xlabel('Comprimento (m)')
-plt.ylabel('Perda (bar/m)')
-plt.grid(True); plt.legend()
+plt.plot(df["L_m"], df["dp_fric"], 'r-', lw=2, label='Perda por Fricção')
+plt.plot(df["L_m"], df["dp_grav"], 'g--', lw=2, label='Perda por Gravidade')
+
+plt.title('Perdas por Fricção e Gravidade (bar/m)', fontsize=14)
+plt.xlabel('Comprimento (m)'); plt.ylabel('Perda (bar/m)')
+plt.legend()
+estilo_padrao()
 plt.show()
+
 
 # ============================================================================
 # GRÁFICO 10: VISCOSIDADES
 # ============================================================================
 plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["mu_o"], 'b-', label='Óleo')
-plt.plot(df["L_m"], df["mu_mix"], 'k-', linewidth=2, label='Mistura')
+plt.plot(df["L_m"], df["mu_o"], color="#39220e", lw=2, label='Óleo')
+plt.plot(df["L_m"], df["mu_mix"], color="#089c0f", lw=2, label='Mistura')
 
-plt.title('Viscosidades (Pa.s)')
-plt.xlabel('Comprimento (m)')
-plt.ylabel('Viscosidade (Pa.s)')
-plt.grid(True)
+plt.title('Viscosidades (Pa.s)', fontsize=14)
+plt.xlabel('Comprimento (m)'); plt.ylabel('Viscosidade (Pa.s)')
 plt.legend()
-
-plt.figure(figsize=(10,5))
-plt.plot(df["L_m"], df["mu_g"], 'r--', label='Gás')
-plt.title('Viscosidade do Gás (Pa.s)')
-plt.xlabel('Comprimento (m)')
-plt.ylabel('Viscosidade (Pa.s)')
-plt.grid(True)
-plt.legend()
+estilo_padrao()
 plt.show()
+
+# GÁS separado
+plt.figure(figsize=(10,5))
+plt.plot(df["L_m"], df["mu_g"], color="#ca0058", lw=2, label='Gás')
+
+plt.title('Viscosidade do Gás (Pa.s)', fontsize=14)
+plt.xlabel('Comprimento (m)'); plt.ylabel('Viscosidade (Pa.s)')
+plt.legend()
+estilo_padrao()
+plt.show()
+
